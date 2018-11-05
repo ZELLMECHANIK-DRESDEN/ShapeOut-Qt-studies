@@ -27,7 +27,7 @@ class ShapeOut(QtWidgets.QMainWindow, MainBase):
         QtWidgets.QMainWindow.__init__(self)
         MainBase.__init__(self)
         self.setupUi(self)
-        self.setWindowTitle("ShapeOut {}".format(__version__))
+        self.setWindowTitle("Shape-Out {}".format(__version__))
         # Disable native menubar (e.g. on Mac)
         self.menubar.setNativeMenuBar(False)
         # Subwindows
@@ -71,7 +71,7 @@ def excepthook(etype, value, trace):
     :param string `trace`: the traceback header, if any (otherwise, it prints the
      standard Python header: ``Traceback (most recent call last)``.
     """
-    vinfo = "Unhandled exception in ShapeOut version {}:\n".format(__version__)
+    vinfo = "Unhandled exception in Shape-Out version {}:\n".format(__version__)
     tmp = traceback.format_exception(etype, value, trace)
     exception = "".join([vinfo]+tmp)
 

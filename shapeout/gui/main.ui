@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <class>ShapeOut</class>
- <widget class="QMainWindow" name="ShapeOut">
+ <widget class="QMainWindow" name="Shape-Out">
   <property name="geometry">
    <rect>
     <x>0</x>

@@ -1,5 +1,5 @@
-ShapeOut2 user interface preview
-================================
+Shape-Out 2 user interface preview
+==================================
 
 To run the new interface, you need at least Python 3.6 installed. To install
 all dependencies, run the following command in the root of the repository:
