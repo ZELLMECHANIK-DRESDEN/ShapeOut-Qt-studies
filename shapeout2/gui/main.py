@@ -8,10 +8,6 @@ from PyQt5 import uic, QtWidgets
 
 from .._version import version as __version__
 
-# load QMainWindow from ui file
-ui_path = pkg_resources.resource_filename("shapeout2.gui", "main.ui")
-MainBase = uic.loadUiType(ui_path)[0]
-
 
 class ShapeOutQMdiSubWindow(QtWidgets.QMdiSubWindow):
     def closeEvent(self, QCloseEvent):
@@ -22,11 +18,11 @@ class ShapeOutQMdiSubWindow(QtWidgets.QMdiSubWindow):
 
 
 
-class ShapeOut2(QtWidgets.QMainWindow, MainBase):
+class ShapeOut2(QtWidgets.QMainWindow):
     def __init__(self):
         QtWidgets.QMainWindow.__init__(self)
-        MainBase.__init__(self)
-        self.setupUi(self)
+        path_ui = pkg_resources.resource_filename("shapeout2.gui", "main.ui")
+        uic.loadUi(path_ui, self)
         self.setWindowTitle("Shape-Out {}".format(__version__))
         # Disable native menubar (e.g. on Mac)
         self.menubar.setNativeMenuBar(False)
