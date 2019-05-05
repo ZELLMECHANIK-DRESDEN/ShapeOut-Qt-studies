@@ -6,16 +6,17 @@ import traceback
 
 from PyQt5 import uic, QtWidgets
 
+from . import quick_view
+
+from ..external import pyqtgraph as pg
 from .._version import version as __version__
 
 
-class ShapeOutQMdiSubWindow(QtWidgets.QMdiSubWindow):
-    def closeEvent(self, QCloseEvent):
-        """Correctly de-register a data set before removing the subwindow"""
-        mainwidget = self.mdiArea().parentWidget().parentWidget()
-        mainwidget.rem_subwindow(self.windowTitle())
-        super(ShapeOutQMdiSubWindow, self).closeEvent(QCloseEvent)
 
+# global plotting configuration parameters
+pg.setConfigOption("background", None)
+pg.setConfigOption("antialias", False)
+pg.setConfigOption("imageAxisOrder", "row-major")
 
 
 class ShapeOut2(QtWidgets.QMainWindow):
@@ -27,34 +28,19 @@ class ShapeOut2(QtWidgets.QMainWindow):
         # Disable native menubar (e.g. on Mac)
         self.menubar.setNativeMenuBar(False)
         # Subwindows
-        self.subwindows = []
-        self.subwindow_data = []
+        self.subwindows = {}
+        self.init_quick_view()
         self.mdiArea.cascadeSubWindows()
         self.showMaximized()
 
-
-    def add_subwindow(self, widget, obj):
-        """Add a subwindow, register data set and add to menu"""
-        sub = ShapeOutQMdiSubWindow()
-        sub.setWidget(widget)
+    def init_quick_view(self):
+        sub = QtWidgets.QMdiSubWindow()
+        sub.hide()
+        self.widget_quick_view = quick_view.QuickView()
+        sub.setWidget(self.widget_quick_view)
         self.mdiArea.addSubWindow(sub)
-        sub.show()
-        self.subwindows.append(sub)
-        self.subwindow_data.append(obj)
-
-
-    def rem_subwindow(self, title):
-        """De-register a data set and remove from the menu"""
-        for ii, sub in enumerate(self.subwindows):
-            if sub.windowTitle() == title:
-                self.subwindows.pop(ii)
-                self.subwindow_data.pop(ii)
-                break
-        
-        for action in self.menuExport.actions():
-            if action.text() == title:
-                self.menuExport.removeAction(action)
-                break
+        self.toolButton_quick_view.clicked.connect(sub.setVisible)
+        self.subwindows["quick_view"] = sub
 
 
 def excepthook(etype, value, trace):
