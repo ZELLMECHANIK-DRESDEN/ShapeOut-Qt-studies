@@ -4,8 +4,9 @@ import signal
 import sys
 import traceback
 
-from PyQt5 import uic, QtWidgets
+from PyQt5 import uic, QtCore, QtWidgets
 
+from . import info_view
 from . import quick_view
 
 from ..external import pyqtgraph as pg
@@ -27,11 +28,29 @@ class ShapeOut2(QtWidgets.QMainWindow):
         self.setWindowTitle("Shape-Out {}".format(__version__))
         # Disable native menubar (e.g. on Mac)
         self.menubar.setNativeMenuBar(False)
+        # Initially hide buttons
+        self.pushButton_preset_load.hide()
+        self.pushButton_preset_save.hide()
+        self.toolButton_show_dm.hide()
         # Subwindows
         self.subwindows = {}
         self.init_quick_view()
+        self.init_info_view()
         self.mdiArea.cascadeSubWindows()
         self.showMaximized()
+
+    def init_info_view(self):
+        sub = QtWidgets.QMdiSubWindow()
+        sub.hide()
+        self.widget_info_view = info_view.InfoView()
+        sub.setWidget(self.widget_info_view)
+        self.mdiArea.addSubWindow(sub)
+        self.toolButton_info_view.clicked.connect(sub.setVisible)
+        self.subwindows["info_view"] = sub
+        sub.setSystemMenu(None)
+        sub.setWindowFlags(QtCore.Qt.CustomizeWindowHint
+                           | QtCore.Qt.WindowTitleHint
+                           | QtCore.Qt.Tool)
 
     def init_quick_view(self):
         sub = QtWidgets.QMdiSubWindow()
@@ -41,6 +60,10 @@ class ShapeOut2(QtWidgets.QMainWindow):
         self.mdiArea.addSubWindow(sub)
         self.toolButton_quick_view.clicked.connect(sub.setVisible)
         self.subwindows["quick_view"] = sub
+        sub.setSystemMenu(None)
+        sub.setWindowFlags(QtCore.Qt.CustomizeWindowHint
+                           | QtCore.Qt.WindowTitleHint
+                           | QtCore.Qt.Tool)
 
 
 def excepthook(etype, value, trace):
