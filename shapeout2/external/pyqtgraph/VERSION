@@ -1,0 +1,9 @@
+The pyqtgraph repository was cloned from https://github.com/pyqtgraph/pyqtgraph
+in April 2019.
+
+# git describe --tags
+pyqtgraph-0.10.0-443-g2e69b9c
+
+# git rev-parse HEAD
+2e69b9c5e6bd8008c2d7e9f384b9c9b32ff2f5a7
+

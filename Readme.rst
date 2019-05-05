@@ -16,5 +16,5 @@ this repository
 
 ::
 
-    python3 -m shapeout
+    python3 -m shapeout2
 
