@@ -1,4 +1,3 @@
-import pathlib
 import pkg_resources
 import signal
 import sys
@@ -38,6 +37,16 @@ class ShapeOut2(QtWidgets.QMainWindow):
         self.init_info_view()
         self.mdiArea.cascadeSubWindows()
         self.showMaximized()
+
+        # data matrix
+        self.toolButton_new_filter.clicked.connect(self.data_matrix.add_filter)
+        self.toolButton_new_dataset.clicked.connect(self.import_dataset)
+        self.toolButton_import.clicked.connect(self.import_dataset)
+
+    def import_dataset(self):
+        path = "test dataset"
+        self.data_matrix.add_dataset(path)
+        self.verticalLayout_3.update()
 
     def init_info_view(self):
         sub = QtWidgets.QMdiSubWindow()
