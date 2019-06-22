@@ -29,23 +29,22 @@ class ShapeOut2(QtWidgets.QMainWindow):
         # Initially hide buttons
         self.pushButton_preset_load.hide()
         self.pushButton_preset_save.hide()
-        self.toolButton_show_dm.hide()
         # Subwindows
         self.subwindows = {}
         self.init_quick_view()
         self.init_info_view()
         self.mdiArea.cascadeSubWindows()
         self.showMaximized()
-
         # data matrix
+        self.toolButton_dm.clicked.connect(self.on_data_matrix)
+        self.splitter.splitterMoved.connect(self.on_splitter)
         self.toolButton_new_filter.clicked.connect(self.data_matrix.add_filter)
         self.toolButton_new_dataset.clicked.connect(self.import_dataset)
         self.toolButton_import.clicked.connect(self.import_dataset)
-
+        
     def import_dataset(self):
         path = "test dataset"
         self.data_matrix.add_dataset(path)
-        self.verticalLayout_3.update()
 
     def init_info_view(self):
         sub = QtWidgets.QMdiSubWindow()
@@ -73,6 +72,18 @@ class ShapeOut2(QtWidgets.QMainWindow):
                            | QtCore.Qt.WindowTitleHint
                            | QtCore.Qt.Tool)
 
+    def on_data_matrix(self):
+        if self.toolButton_dm.isChecked():
+            self.splitter.setSizes([200,1000])
+        else:
+            self.splitter.setSizes([0,1])
+
+    def on_splitter(self):
+        if self.splitter.sizes()[0] == 0:
+            self.toolButton_dm.setChecked(False)
+        else:
+            self.toolButton_dm.setChecked(True)
+    
 
 def excepthook(etype, value, trace):
     """
