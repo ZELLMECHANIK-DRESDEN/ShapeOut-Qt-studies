@@ -159,7 +159,7 @@
       <property name="childrenCollapsible">
        <bool>false</bool>
       </property>
-      <widget class="QWidget" name="">
+      <widget class="QWidget" name="layoutWidget">
        <layout class="QHBoxLayout" name="horizontalLayout_2">
         <property name="spacing">
          <number>0</number>
@@ -317,6 +317,9 @@
               </item>
               <item row="0" column="3" alignment="Qt::AlignTop">
                <widget class="QToolButton" name="toolButton">
+                <property name="toolTip">
+                 <string>Add a new plot</string>
+                </property>
                 <property name="text">
                  <string>+</string>
                 </property>

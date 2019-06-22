@@ -1,4 +1,4 @@
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtWidgets
 
 from .matrix_dataset import MatrixDataset
 from .matrix_filter import MatrixFilter
@@ -13,16 +13,13 @@ class DataMatrix(QtWidgets.QWidget):
         self.layout.setSpacing(2)
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(self.layout)
-
         self.setAcceptDrops(True)
-
-        self.add_filter()
-        self.repaint()
-        self.add_dataset(path="data 1")
-        self.add_dataset(path="dataset 2 with a long title")
 
     def add_dataset(self, path, row=None):
         nrows = self.layout.rowCount()
+        if nrows == 1:
+            self.add_filter()
+
         if row is None:
             self.layout.addWidget(MatrixDataset(path), nrows, 0)
         else:

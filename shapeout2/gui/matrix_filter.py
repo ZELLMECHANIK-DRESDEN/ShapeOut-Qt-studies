@@ -1,6 +1,6 @@
 import pkg_resources
 
-from PyQt5 import uic, QtWidgets, QtCore
+from PyQt5 import uic, QtWidgets
 
 
 class MatrixFilter(QtWidgets.QWidget):
@@ -9,10 +9,6 @@ class MatrixFilter(QtWidgets.QWidget):
         path_ui = pkg_resources.resource_filename(
             "shapeout2.gui", "matrix_filter.ui")
         uic.loadUi(path_ui, self)
-
-        self.setFixedSize(QtCore.QSize(80, 80))
-        self.resize(QtCore.QSize(80, 80))
-        self.setMaximumSize(QtCore.QSize(80, 80))
 
         self.label.setToolTip(title)
         if len(title) > 8:
