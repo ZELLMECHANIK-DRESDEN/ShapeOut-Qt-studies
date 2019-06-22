@@ -67,6 +67,9 @@
        <height>1000</height>
       </size>
      </property>
+     <property name="toolTip">
+      <string/>
+     </property>
      <property name="layoutDirection">
       <enum>Qt::LeftToRight</enum>
      </property>
@@ -98,20 +101,13 @@
          </sizepolicy>
         </property>
         <property name="toolTip">
-         <string>Click to apply filter</string>
+         <string/>
         </property>
         <property name="text">
          <string>inactive</string>
         </property>
         <property name="alignment">
-         <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="pushButton">
-        <property name="text">
-         <string>toggle</string>
+         <set>Qt::AlignCenter</set>
         </property>
        </widget>
       </item>
