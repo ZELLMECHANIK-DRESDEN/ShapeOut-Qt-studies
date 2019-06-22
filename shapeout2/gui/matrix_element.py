@@ -5,10 +5,11 @@ from PyQt5 import uic, QtWidgets, QtCore
 
 class MatrixElement(QtWidgets.QWidget):
     _quick_view_instance = None
-    
+
     def __init__(self, title="Name"):
         QtWidgets.QWidget.__init__(self)
-        path_ui = pkg_resources.resource_filename("shapeout2.gui", "matrix_element.ui")
+        path_ui = pkg_resources.resource_filename(
+            "shapeout2.gui", "matrix_element.ui")
         uic.loadUi(path_ui, self)
 
         self.selected = False
@@ -21,7 +22,7 @@ class MatrixElement(QtWidgets.QWidget):
         if event.modifiers() == QtCore.Qt.ShiftModifier:
             quickview = True
         else:
-            self.selected = not self.selected   
+            self.selected = not self.selected
             quickview = False
         self.update_content(quickview)
         event.accept()
@@ -40,7 +41,7 @@ class MatrixElement(QtWidgets.QWidget):
             label = "inactive"
             tooltip = "Click to activate\nShift+Click for QuickView"
         else:
-            color = "#C0C1C0" # gray
+            color = "#C0C1C0"  # gray
             label = "inactive"
             tooltip = "Click to activate\nShift+Click for QuickView"
 

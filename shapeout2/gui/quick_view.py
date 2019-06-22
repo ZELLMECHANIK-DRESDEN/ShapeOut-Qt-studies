@@ -8,7 +8,8 @@ from ..external import pyqtgraph as pg
 class QuickView(QtWidgets.QWidget):
     def __init__(self, *args, **kwargs):
         QtWidgets.QWidget.__init__(self)
-        path_ui = pkg_resources.resource_filename("shapeout2.gui", "quick_view.ui")
+        path_ui = pkg_resources.resource_filename(
+            "shapeout2.gui", "quick_view.ui")
         uic.loadUi(path_ui, self)
         self.setWindowTitle("Quick View")
         self.scatter_plot = self.widget_scatter.plot

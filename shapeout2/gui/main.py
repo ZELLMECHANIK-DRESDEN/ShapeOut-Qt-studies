@@ -12,7 +12,6 @@ from ..external import pyqtgraph as pg
 from .._version import version as __version__
 
 
-
 # global plotting configuration parameters
 pg.setConfigOption("background", None)
 pg.setConfigOption("antialias", False)
@@ -78,25 +77,28 @@ class ShapeOut2(QtWidgets.QMainWindow):
 def excepthook(etype, value, trace):
     """
     Handler for all unhandled exceptions.
- 
+
     :param `etype`: the exception type (`SyntaxError`, `ZeroDivisionError`, etc...);
     :type `etype`: `Exception`
     :param string `value`: the exception error message;
     :param string `trace`: the traceback header, if any (otherwise, it prints the
      standard Python header: ``Traceback (most recent call last)``.
     """
-    vinfo = "Unhandled exception in Shape-Out version {}:\n".format(__version__)
+    vinfo = "Unhandled exception in Shape-Out version {}:\n".format(
+        __version__)
     tmp = traceback.format_exception(etype, value, trace)
     exception = "".join([vinfo]+tmp)
 
     errorbox = QtWidgets.QMessageBox()
-    errorbox.addButton(QtWidgets.QPushButton('Close'), QtWidgets.QMessageBox.YesRole)
-    errorbox.addButton(QtWidgets.QPushButton('Copy text && Close'), QtWidgets.QMessageBox.NoRole)
+    errorbox.addButton(QtWidgets.QPushButton('Close'),
+                       QtWidgets.QMessageBox.YesRole)
+    errorbox.addButton(QtWidgets.QPushButton(
+        'Copy text && Close'), QtWidgets.QMessageBox.NoRole)
     errorbox.setText(exception)
     ret = errorbox.exec_()
-    if ret==1: 
+    if ret == 1:
         cb = QtWidgets.QApplication.clipboard()
-        cb.clear(mode=cb.Clipboard )
+        cb.clear(mode=cb.Clipboard)
         cb.setText(exception)
 
 
