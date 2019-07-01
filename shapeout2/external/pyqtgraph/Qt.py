@@ -9,7 +9,10 @@ This module exists to smooth out some of the differences between PySide and PyQt
 
 """
 
-import os, sys, re, time
+import os
+import sys
+import re
+import time
 
 from .python2_3 import asUnicode
 
@@ -20,10 +23,10 @@ PYQT5 = 'PyQt5'
 
 QT_LIB = os.getenv('PYQTGRAPH_QT_LIB')
 
-## Automatically determine which Qt package to use (unless specified by
-## environment variable).
-## This is done by first checking to see whether one of the libraries
-## is already imported. If not, then attempt to import PyQt4, then PySide.
+# Automatically determine which Qt package to use (unless specified by
+# environment variable).
+# This is done by first checking to see whether one of the libraries
+# is already imported. If not, then attempt to import PyQt4, then PySide.
 if QT_LIB is None:
     libOrder = [PYQT4, PYSIDE, PYQT5, PYSIDE2]
 
@@ -42,15 +45,17 @@ if QT_LIB is None:
             pass
 
 if QT_LIB is None:
-    raise Exception("PyQtGraph requires one of PyQt4, PyQt5, PySide or PySide2; none of these packages could be imported.")
+    raise Exception(
+        "PyQtGraph requires one of PyQt4, PyQt5, PySide or PySide2; none of these packages could be imported.")
 
 
 class FailedImport(object):
     """Used to defer ImportErrors until we are sure the module is needed.
     """
+
     def __init__(self, err):
         self.err = err
-        
+
     def __getattr__(self, attr):
         raise self.err
 
@@ -64,7 +69,8 @@ def _isQObjectAlive(obj):
         elif hasattr(obj, 'parentItem'):
             obj.parentItem()
         else:
-            raise Exception("Cannot determine whether Qt object %s is still alive." % obj)
+            raise Exception(
+                "Cannot determine whether Qt object %s is still alive." % obj)
     except RuntimeError:
         return False
     else:
@@ -78,16 +84,17 @@ def _isQObjectAlive(obj):
 
 class _StringIO(object):
     """Alternative to built-in StringIO needed to circumvent unicode/ascii issues"""
+
     def __init__(self):
         self.data = []
-    
+
     def write(self, data):
         self.data.append(data)
-        
+
     def getvalue(self):
         return ''.join(map(asUnicode, self.data)).encode('utf8')
 
-    
+
 def _loadUiType(uiFile):
     """
     PySide lacks a "loadUiType" command like PyQt4's, so we have to convert
@@ -103,11 +110,11 @@ def _loadUiType(uiFile):
     import pysideuic
     import xml.etree.ElementTree as xml
     #from io import StringIO
-    
+
     parsed = xml.parse(uiFile)
     widget_class = parsed.find('widget').get('class')
     form_class = parsed.find('class').text
-    
+
     with open(uiFile, 'r') as f:
         o = _StringIO()
         frame = {}
@@ -116,9 +123,9 @@ def _loadUiType(uiFile):
         pyc = compile(o.getvalue(), '<string>', 'exec')
         exec(pyc, frame)
 
-        #Fetch the base_class and form class based on their type in the xml from designer
-        form_class = frame['Ui_%s'%form_class]
-        base_class = eval('QtGui.%s'%widget_class)
+        # Fetch the base_class and form class based on their type in the xml from designer
+        form_class = frame['Ui_%s' % form_class]
+        base_class = eval('QtGui.%s' % widget_class)
 
     return form_class, base_class
 
@@ -139,17 +146,17 @@ if QT_LIB == PYSIDE:
         from PySide import QtTest
     except ImportError as err:
         QtTest = FailedImport(err)
-    
+
     try:
         from PySide import shiboken
         isQObjectAlive = shiboken.isValid
     except ImportError:
         # use approximate version
         isQObjectAlive = _isQObjectAlive
-    
+
     import PySide
     VERSION_INFO = 'PySide ' + PySide.__version__ + ' Qt ' + QtCore.__version__
-    
+
 elif QT_LIB == PYQT4:
     from PyQt4 import QtGui, QtCore, uic
     try:
@@ -171,7 +178,7 @@ elif QT_LIB == PYQT5:
     # We're using PyQt5 which has a different structure so we're going to use a shim to
     # recreate the Qt4 structure for Qt5
     from PyQt5 import QtGui, QtCore, QtWidgets, uic
-    
+
     # PyQt5, starting in v5.5, calls qAbort when an exception is raised inside
     # a slot. To maintain backward compatibility (and sanity for interactive
     # users), we install a global exception hook to override this behavior.
@@ -179,10 +186,11 @@ elif QT_LIB == PYQT5:
     if int(ver[1]) >= 5:
         if sys.excepthook == sys.__excepthook__:
             sys_excepthook = sys.excepthook
+
             def pyqt5_qabort_override(*args, **kwds):
                 return sys_excepthook(*args, **kwds)
             sys.excepthook = pyqt5_qabort_override
-    
+
     try:
         from PyQt5 import QtSvg
     except ImportError as err:
@@ -201,7 +209,7 @@ elif QT_LIB == PYQT5:
 
 elif QT_LIB == PYSIDE2:
     from PySide2 import QtGui, QtCore, QtWidgets
-    
+
     try:
         from PySide2 import QtSvg
     except ImportError as err:
@@ -217,7 +225,7 @@ elif QT_LIB == PYSIDE2:
         QtTest = FailedImport(err)
 
     isQObjectAlive = _isQObjectAlive
-    
+
     import PySide2
     VERSION_INFO = 'PySide2 ' + PySide2.__version__ + ' Qt ' + QtCore.__version__
 
@@ -229,7 +237,7 @@ else:
 if QT_LIB in [PYQT5, PYSIDE2]:
     # We're using Qt5 which has a different structure so we're going to use a shim to
     # recreate the Qt4 structure
-    
+
     __QGraphicsItem_scale = QtWidgets.QGraphicsItem.scale
 
     def scale(self, *args):
@@ -263,25 +271,24 @@ if QT_LIB in [PYQT5, PYSIDE2]:
         self.setSectionResizeMode(*args)
     QtWidgets.QHeaderView.setResizeMode = setResizeMode
 
-    
     QtGui.QApplication = QtWidgets.QApplication
     QtGui.QGraphicsScene = QtWidgets.QGraphicsScene
     QtGui.QGraphicsObject = QtWidgets.QGraphicsObject
     QtGui.QGraphicsWidget = QtWidgets.QGraphicsWidget
 
     QtGui.QApplication.setGraphicsSystem = None
-    
+
     # Import all QtWidgets objects into QtGui
     for o in dir(QtWidgets):
         if o.startswith('Q'):
-            setattr(QtGui, o, getattr(QtWidgets,o) )
-    
+            setattr(QtGui, o, getattr(QtWidgets, o))
+
 
 # Common to PySide and PySide2
 if QT_LIB in [PYSIDE, PYSIDE2]:
     QtVersion = QtCore.__version__
     loadUiType = _loadUiType
-        
+
     # PySide does not implement qWait
     if not isinstance(QtTest, FailedImport):
         if not hasattr(QtTest.QTest, 'qWait'):
@@ -297,33 +304,37 @@ if QT_LIB in [PYSIDE, PYSIDE2]:
 # Common to PyQt4 and 5
 if QT_LIB in [PYQT4, PYQT5]:
     QtVersion = QtCore.QT_VERSION_STR
-    
+
     import sip
+
     def isQObjectAlive(obj):
         return not sip.isdeleted(obj)
-    
+
     loadUiType = uic.loadUiType
 
     QtCore.Signal = QtCore.pyqtSignal
-    
+
 
 # USE_XXX variables are deprecated
 USE_PYSIDE = QT_LIB == PYSIDE
 USE_PYQT4 = QT_LIB == PYQT4
 USE_PYQT5 = QT_LIB == PYQT5
 
-    
-## Make sure we have Qt >= 4.7
+
+# Make sure we have Qt >= 4.7
 versionReq = [4, 7]
 m = re.match(r'(\d+)\.(\d+).*', QtVersion)
 if m is not None and list(map(int, m.groups())) < versionReq:
     print(list(map(int, m.groups())))
-    raise Exception('pyqtgraph requires Qt version >= %d.%d  (your version is %s)' % (versionReq[0], versionReq[1], QtVersion))
+    raise Exception('pyqtgraph requires Qt version >= %d.%d  (your version is %s)' % (
+        versionReq[0], versionReq[1], QtVersion))
 
 
 QAPP = None
+
+
 def mkQApp():
-    global QAPP    
+    global QAPP
     QAPP = QtGui.QApplication.instance()
     if QAPP is None:
         QAPP = QtGui.QApplication([])

@@ -1,6 +1,8 @@
+import pathlib
 import pkg_resources
 
-from PyQt5 import uic, QtWidgets
+import dclab
+from PyQt5 import uic, QtCore, QtWidgets
 
 from ..external import pyqtgraph as pg
 
@@ -15,10 +17,6 @@ class QuickView(QtWidgets.QWidget):
         self.scatter_plot = self.widget_scatter.plot
         self.scatter_plot.sigClicked.connect(self.clicked)
 
-    def showDataset(self, ds, axis_x="area_um", axis_y="deform"):
-        self.scatter_plot.clear()
-        self.scatter_plot.setData(x=ds[axis_x], y=ds[axis_y])
-
     def clicked(self, plot, points):
         for p in plot.lastClicked:
             p.resetPen()
@@ -26,6 +24,14 @@ class QuickView(QtWidgets.QWidget):
         for p in points:
             p.setPen('b', width=2)
         plot.lastClicked = points
+
+    @QtCore.pyqtSlot(pathlib.Path, list)
+    def show_rtdc(self, path, filters):
+        axis_x = "area_um"
+        axis_y = "deform"
+        ds = dclab.new_dataset(path)
+        self.scatter_plot.clear()
+        self.scatter_plot.setData(x=ds[axis_x], y=ds[axis_y])
 
 
 class RTDCScatterWidget(pg.PlotWidget):

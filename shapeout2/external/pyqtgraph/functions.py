@@ -8,53 +8,58 @@ Distributed under MIT/X11 license. See license.txt for more infomation.
 from __future__ import division
 import warnings
 import numpy as np
-import decimal, re
+import decimal
+import re
 import ctypes
-import sys, struct
+import sys
+import struct
 from .python2_3 import asUnicode, basestring
 from .Qt import QtGui, QtCore, QT_LIB
 from . import getConfigOption, setConfigOptions
 from . import debug, reload
-from .reload import getPreviousVersion 
+from .reload import getPreviousVersion
 from .metaarray import MetaArray
 
 
 Colors = {
-    'b': QtGui.QColor(0,0,255,255),
-    'g': QtGui.QColor(0,255,0,255),
-    'r': QtGui.QColor(255,0,0,255),
-    'c': QtGui.QColor(0,255,255,255),
-    'm': QtGui.QColor(255,0,255,255),
-    'y': QtGui.QColor(255,255,0,255),
-    'k': QtGui.QColor(0,0,0,255),
-    'w': QtGui.QColor(255,255,255,255),
-    'd': QtGui.QColor(150,150,150,255),
-    'l': QtGui.QColor(200,200,200,255),
-    's': QtGui.QColor(100,100,150,255),
-}  
+    'b': QtGui.QColor(0, 0, 255, 255),
+    'g': QtGui.QColor(0, 255, 0, 255),
+    'r': QtGui.QColor(255, 0, 0, 255),
+    'c': QtGui.QColor(0, 255, 255, 255),
+    'm': QtGui.QColor(255, 0, 255, 255),
+    'y': QtGui.QColor(255, 255, 0, 255),
+    'k': QtGui.QColor(0, 0, 0, 255),
+    'w': QtGui.QColor(255, 255, 255, 255),
+    'd': QtGui.QColor(150, 150, 150, 255),
+    'l': QtGui.QColor(200, 200, 200, 255),
+    's': QtGui.QColor(100, 100, 150, 255),
+}
 
 SI_PREFIXES = asUnicode('yzafpnµm kMGTPEZY')
 SI_PREFIXES_ASCII = 'yzafpnum kMGTPEZY'
-SI_PREFIX_EXPONENTS = dict([(SI_PREFIXES[i], (i-8)*3) for i in range(len(SI_PREFIXES))])
+SI_PREFIX_EXPONENTS = dict([(SI_PREFIXES[i], (i-8)*3)
+                            for i in range(len(SI_PREFIXES))])
 SI_PREFIX_EXPONENTS['u'] = -6
 
-FLOAT_REGEX = re.compile(r'(?P<number>[+-]?((\d+(\.\d*)?)|(\d*\.\d+))([eE][+-]?\d+)?)\s*((?P<siPrefix>[u' + SI_PREFIXES + r']?)(?P<suffix>\w.*))?$')
-INT_REGEX = re.compile(r'(?P<number>[+-]?\d+)\s*(?P<siPrefix>[u' + SI_PREFIXES + r']?)(?P<suffix>.*)$')
+FLOAT_REGEX = re.compile(
+    r'(?P<number>[+-]?((\d+(\.\d*)?)|(\d*\.\d+))([eE][+-]?\d+)?)\s*((?P<siPrefix>[u' + SI_PREFIXES + r']?)(?P<suffix>\w.*))?$')
+INT_REGEX = re.compile(
+    r'(?P<number>[+-]?\d+)\s*(?P<siPrefix>[u' + SI_PREFIXES + r']?)(?P<suffix>.*)$')
 
-    
+
 def siScale(x, minVal=1e-25, allowUnicode=True):
     """
     Return the recommended scale factor and SI prefix string for x.
-    
+
     Example::
-    
+
         siScale(0.0001)   # returns (1e6, 'μ')
         # This indicates that the number 0.0001 is best represented as 0.0001 * 1e6 = 100 μUnits
     """
-    
+
     if isinstance(x, decimal.Decimal):
         x = float(x)
-        
+
     try:
         if np.isnan(x) or np.isinf(x):
             return(1, '')
@@ -66,7 +71,7 @@ def siScale(x, minVal=1e-25, allowUnicode=True):
         x = 0
     else:
         m = int(np.clip(np.floor(np.log(abs(x))/np.log(1000)), -9.0, 9.0))
-    
+
     if m == 0:
         pref = ''
     elif m < -8 or m > 8:
@@ -77,28 +82,27 @@ def siScale(x, minVal=1e-25, allowUnicode=True):
         else:
             pref = SI_PREFIXES_ASCII[m+8]
     p = .001**m
-    
-    return (p, pref)    
+
+    return (p, pref)
 
 
 def siFormat(x, precision=3, suffix='', space=True, error=None, minVal=1e-25, allowUnicode=True):
     """
     Return the number x formatted in engineering notation with SI prefix.
-    
+
     Example::
         siFormat(0.0001, suffix='V')  # returns "100 μV"
     """
-    
+
     if space is True:
         space = ' '
     if space is False:
         space = ''
-        
-    
+
     (p, pref) = siScale(x, minVal, allowUnicode)
     if not (len(pref) > 0 and pref[0] == 'e'):
         pref = space + pref
-    
+
     if error is None:
         fmt = "%." + str(precision) + "g%s%s"
         return fmt % (x*p, pref, suffix)
@@ -113,18 +117,20 @@ def siFormat(x, precision=3, suffix='', space=True, error=None, minVal=1e-25, al
 
 def siParse(s, regex=FLOAT_REGEX, suffix=None):
     """Convert a value written in SI notation to a tuple (number, si_prefix, suffix).
-    
+
     Example::
-    
+
         siParse('100 μV")  # returns ('100', 'μ', 'V')
     """
     s = asUnicode(s)
     s = s.strip()
     if suffix is not None and len(suffix) > 0:
         if s[-len(suffix):] != suffix:
-            raise ValueError("String '%s' does not have the expected suffix '%s'" % (s, suffix))
-        s = s[:-len(suffix)] + 'X'  # add a fake suffix so the regex still picks up the si prefix
-        
+            raise ValueError(
+                "String '%s' does not have the expected suffix '%s'" % (s, suffix))
+        # add a fake suffix so the regex still picks up the si prefix
+        s = s[:-len(suffix)] + 'X'
+
     m = regex.match(s)
     if m is None:
         raise ValueError('Cannot parse number "%s"' % s)
@@ -132,7 +138,7 @@ def siParse(s, regex=FLOAT_REGEX, suffix=None):
         sip = m.group('siPrefix')
     except IndexError:
         sip = ''
-    
+
     if suffix is None:
         try:
             suf = m.group('suffix')
@@ -140,8 +146,8 @@ def siParse(s, regex=FLOAT_REGEX, suffix=None):
             suf = ''
     else:
         suf = suffix
-    
-    return m.group('number'), '' if sip is None else sip, '' if suf is None else suf 
+
+    return m.group('number'), '' if sip is None else sip, '' if suf is None else suf
 
 
 def siEval(s, typ=float, regex=FLOAT_REGEX, suffix=None):
@@ -149,14 +155,14 @@ def siEval(s, typ=float, regex=FLOAT_REGEX, suffix=None):
     Convert a value written in SI notation to its equivalent prefixless value.
 
     Example::
-    
+
         siEval("100 μV")  # returns 0.0001
     """
     val, siprefix, suffix = siParse(s, regex, suffix=suffix)
     v = typ(val)
     return siApply(v, siprefix)
 
-    
+
 def siApply(val, siprefix):
     """
     """
@@ -168,24 +174,24 @@ def siApply(val, siprefix):
         return val / 10**-n
     else:
         return val
-    
+
 
 class Color(QtGui.QColor):
     def __init__(self, *args):
         QtGui.QColor.__init__(self, mkColor(*args))
-        
+
     def glColor(self):
         """Return (r,g,b,a) normalized for use in opengl"""
         return (self.red()/255., self.green()/255., self.blue()/255., self.alpha()/255.)
-        
+
     def __getitem__(self, ind):
         return (self.red, self.green, self.blue, self.alpha)[ind]()
-        
-    
+
+
 def mkColor(*args):
     """
     Convenience function for constructing QColor from a variety of argument types. Accepted arguments are:
-    
+
     ================ ================================================
      'c'             one of: r, g, b, c, m, y, k, w                      
      R, G, B, [A]    integers 0-255
@@ -257,8 +263,8 @@ def mkColor(*args):
         (r, g, b, a) = args
     else:
         raise TypeError(err)
-    
-    args = [r,g,b,a]
+
+    args = [r, g, b, a]
     args = [0 if np.isnan(a) or np.isinf(a) else a for a in args]
     args = list(map(int, args))
     return QtGui.QColor(*args)
@@ -288,44 +294,44 @@ def mkBrush(*args, **kwds):
 def mkPen(*args, **kargs):
     """
     Convenience function for constructing QPen. 
-    
+
     Examples::
-    
+
         mkPen(color)
         mkPen(color, width=2)
         mkPen(cosmetic=False, width=4.5, color='r')
         mkPen({'color': "FF0", width: 2})
         mkPen(None)   # (no pen)
-    
+
     In these examples, *color* may be replaced with any arguments accepted by :func:`mkColor() <pyqtgraph.mkColor>`    """
-    
+
     color = kargs.get('color', None)
     width = kargs.get('width', 1)
     style = kargs.get('style', None)
     dash = kargs.get('dash', None)
     cosmetic = kargs.get('cosmetic', True)
     hsv = kargs.get('hsv', None)
-    
+
     if len(args) == 1:
         arg = args[0]
         if isinstance(arg, dict):
             return mkPen(**arg)
         if isinstance(arg, QtGui.QPen):
-            return QtGui.QPen(arg)  ## return a copy of this pen
+            return QtGui.QPen(arg)  # return a copy of this pen
         elif arg is None:
             style = QtCore.Qt.NoPen
         else:
             color = arg
     if len(args) > 1:
         color = args
-        
+
     if color is None:
         color = mkColor('l')
     if hsv is not None:
         color = hsvColor(*hsv)
     else:
         color = mkColor(color)
-        
+
     pen = QtGui.QPen(QtGui.QBrush(color), width)
     pen.setCosmetic(cosmetic)
     if style is not None:
@@ -341,7 +347,7 @@ def hsvColor(hue, sat=1.0, val=1.0, alpha=1.0):
     c.setHsvF(hue, sat, val, alpha)
     return c
 
-    
+
 def colorTuple(c):
     """Return a tuple (R,G,B,A) from a QColor"""
     return (c.red(), c.green(), c.blue(), c.alpha())
@@ -355,9 +361,9 @@ def colorStr(c):
 def intColor(index, hues=9, values=1, maxValue=255, minValue=150, maxHue=360, minHue=0, sat=255, alpha=255):
     """
     Creates a QColor from a single index. Useful for stepping through a predefined list of colors.
-    
+
     The argument *index* determines which color from the set will be returned. All other arguments determine what the set of predefined colors will be
-     
+
     Colors are chosen by cycling across hues while varying the value (brightness). 
     By default, this selects from a list of 9 hues."""
     hues = int(hues)
@@ -370,7 +376,7 @@ def intColor(index, hues=9, values=1, maxValue=255, minValue=150, maxHue=360, mi
     else:
         v = maxValue
     h = minHue + (indh * (maxHue-minHue)) / hues
-    
+
     c = QtGui.QColor()
     c.setHsv(h, sat, v)
     c.setAlpha(alpha)
@@ -385,7 +391,6 @@ def glColor(*args, **kargs):
     c = mkColor(*args, **kargs)
     return (c.red()/255., c.green()/255., c.blue()/255., c.alpha()/255.)
 
-    
 
 def makeArrowPath(headLen=20, tipAngle=20, tailLen=20, tailWidth=3, baseAngle=0):
     """
@@ -396,7 +401,7 @@ def makeArrowPath(headLen=20, tipAngle=20, tailLen=20, tailWidth=3, baseAngle=0)
     """
     headWidth = headLen * np.tan(tipAngle * 0.5 * np.pi/180.)
     path = QtGui.QPainterPath()
-    path.moveTo(0,0)
+    path.moveTo(0, 0)
     path.lineTo(headLen, -headWidth)
     if tailLen is None:
         innerY = headLen - headWidth * np.tan(baseAngle*np.pi/180.)
@@ -409,15 +414,15 @@ def makeArrowPath(headLen=20, tipAngle=20, tailLen=20, tailWidth=3, baseAngle=0)
         path.lineTo(headLen + tailLen, tailWidth)
         path.lineTo(innerY, tailWidth)
     path.lineTo(headLen, headWidth)
-    path.lineTo(0,0)
+    path.lineTo(0, 0)
     return path
-    
-    
+
+
 def eq(a, b):
     """The great missing equivalence function: Guaranteed evaluation to a single bool value.
-    
+
     This function has some important differences from the == operator:
-    
+
     1. Returns True if a IS b, even if a==b still evaluates to False, such as with nan values.
     2. Tests for equivalence using ==, but silently ignores some common exceptions that can occur
        (AtrtibuteError, ValueError).
@@ -440,17 +445,18 @@ def eq(a, b):
     if aIsArr and bIsArr and (a.shape != b.shape or a.dtype != b.dtype):
         return False
 
-    # Test for equivalence. 
+    # Test for equivalence.
     # If the test raises a recognized exception, then return Falase
     try:
         try:
             # Sometimes running catch_warnings(module=np) generates AttributeError ???
-            catcher =  warnings.catch_warnings(module=np)  # ignore numpy futurewarning (numpy v. 1.10)
+            # ignore numpy futurewarning (numpy v. 1.10)
+            catcher = warnings.catch_warnings(module=np)
             catcher.__enter__()
         except Exception:
             catcher = None
-        e = a==b
-    except (ValueError, AttributeError): 
+        e = a == b
+    except (ValueError, AttributeError):
         return False
     except:
         print('failed to evaluate equivalence for:')
@@ -460,14 +466,14 @@ def eq(a, b):
     finally:
         if catcher is not None:
             catcher.__exit__(None, None, None)
-    
+
     t = type(e)
     if t is bool:
         return e
     elif t is np.bool_:
         return bool(e)
     elif isinstance(e, np.ndarray) or (hasattr(e, 'implements') and e.implements('MetaArray')):
-        try:   ## disaster: if a is an empty array and b is not, then e.all() is True
+        try:  # disaster: if a is an empty array and b is not, then e.all() is True
             if a.shape != b.shape:
                 return False
         except:
@@ -491,36 +497,38 @@ def affineSliceCoords(shape, origin, vectors, axes):
     for v in vectors:
         if len(v) != len(axes):
             raise Exception("each vector must be same length as axes.")
-        
+
     shape = list(map(np.ceil, shape))
 
-    ## make sure vectors are arrays
+    # make sure vectors are arrays
     if not isinstance(vectors, np.ndarray):
         vectors = np.array(vectors)
     if not isinstance(origin, np.ndarray):
         origin = np.array(origin)
     origin.shape = (len(axes),) + (1,)*len(shape)
 
-    ## Build array of sample locations. 
-    grid = np.mgrid[tuple([slice(0,x) for x in shape])]  ## mesh grid of indexes
-    x = (grid[np.newaxis,...] * vectors.transpose()[(Ellipsis,) + (np.newaxis,)*len(shape)]).sum(axis=1)  ## magic
+    # Build array of sample locations.
+    grid = np.mgrid[tuple([slice(0, x) for x in shape])
+                    ]  # mesh grid of indexes
+    x = (grid[np.newaxis, ...] * vectors.transpose()
+         [(Ellipsis,) + (np.newaxis,)*len(shape)]).sum(axis=1)  # magic
     x += origin
 
     return x
 
-    
+
 def affineSlice(data, shape, origin, vectors, axes, order=1, returnCoords=False, **kargs):
     """
     Take a slice of any orientation through an array. This is useful for extracting sections of multi-dimensional arrays
     such as MRI images for viewing as 1D or 2D data.
-    
+
     The slicing axes are aribtrary; they do not need to be orthogonal to the original data or even to each other. It is
     possible to use this function to extract arbitrary linear, rectangular, or parallelepiped shapes from within larger
     datasets. The original data is interpolated onto a new array of coordinates using either interpolateArray if order<2
     or scipy.ndimage.map_coordinates otherwise.
-    
+
     For a graphical interface to this function, see :func:`ROI.getArrayRegion <pyqtgraph.ROI.getArrayRegion>`
-    
+
     ==============  ====================================================================================================
     **Arguments:**
     *data*          (ndarray) the original dataset
@@ -538,53 +546,55 @@ def affineSlice(data, shape, origin, vectors, axes, order=1, returnCoords=False,
     *All extra keyword arguments are passed to scipy.ndimage.map_coordinates.*
     --------------------------------------------------------------------------------------------------------------------
     ==============  ====================================================================================================
-    
+
     Note the following must be true: 
-        
+
         | len(shape) == len(vectors) 
         | len(origin) == len(axes) == len(vectors[i])
-        
+
     Example: start with a 4D fMRI data set, take a diagonal-planar slice out of the last 3 axes
-        
+
         * data = array with dims (time, x, y, z) = (100, 40, 40, 40)
         * The plane to pull out is perpendicular to the vector (x,y,z) = (1,1,1) 
         * The origin of the slice will be at (x,y,z) = (40, 0, 0)
         * We will slice a 20x20 plane from each timepoint, giving a final shape (100, 20, 20)
-        
+
     The call for this example would look like::
-        
+
         affineSlice(data, shape=(20,20), origin=(40,0,0), vectors=((-1, 1, 0), (-1, 0, 1)), axes=(1,2,3))
-    
+
     """
     x = affineSliceCoords(shape, origin, vectors, axes)
 
-    ## transpose data so slice axes come first
+    # transpose data so slice axes come first
     trAx = list(range(data.ndim))
     for ax in axes:
         trAx.remove(ax)
     tr1 = tuple(axes) + tuple(trAx)
     data = data.transpose(tr1)
-    #print "tr1:", tr1
-    ## dims are now [(slice axes), (other axes)]
+    # print "tr1:", tr1
+    # dims are now [(slice axes), (other axes)]
 
     if order > 1:
         try:
             import scipy.ndimage
         except ImportError:
-            raise ImportError("Interpolating with order > 1 requires the scipy.ndimage module, but it could not be imported.")
+            raise ImportError(
+                "Interpolating with order > 1 requires the scipy.ndimage module, but it could not be imported.")
 
         # iterate manually over unused axes since map_coordinates won't do it for us
         extraShape = data.shape[len(axes):]
         output = np.empty(tuple(shape) + extraShape, dtype=data.dtype)
         for inds in np.ndindex(*extraShape):
             ind = (Ellipsis,) + inds
-            output[ind] = scipy.ndimage.map_coordinates(data[ind], x, order=order, **kargs)
+            output[ind] = scipy.ndimage.map_coordinates(
+                data[ind], x, order=order, **kargs)
     else:
         # map_coordinates expects the indexes as the first axis, whereas
-        # interpolateArray expects indexes at the last axis. 
+        # interpolateArray expects indexes at the last axis.
         tr = tuple(range(1, x.ndim)) + (0,)
         output = interpolateArray(data, x.transpose(tr), order=order)
-    
+
     tr = list(range(output.ndim))
     trb = []
     for i in range(min(axes)):
@@ -593,7 +603,7 @@ def affineSlice(data, shape, origin, vectors, axes, order=1, returnCoords=False,
         trb.append(ind)
     tr2 = tuple(trb+tr)
 
-    ## Untranspose array before returning
+    # Untranspose array before returning
     output = output.transpose(tr2)
     if returnCoords:
         return (output, x)
@@ -604,11 +614,11 @@ def affineSlice(data, shape, origin, vectors, axes, order=1, returnCoords=False,
 def interpolateArray(data, x, default=0.0, order=1):
     """
     N-dimensional interpolation similar to scipy.ndimage.map_coordinates.
-    
+
     This function returns linearly-interpolated values sampled from a regular
     grid of data. It differs from `ndimage.map_coordinates` by allowing broadcasting
     within the input array.
-    
+
     ==============  ===========================================================================================
     **Arguments:**
     *data*          Array of any shape containing the values to be interpolated.
@@ -618,44 +628,44 @@ def interpolateArray(data, x, default=0.0, order=1):
     *default*       Value to return for locations in *x* that are outside the bounds of *data*.
     *order*         Order of interpolation: 0=nearest, 1=linear.
     ==============  ===========================================================================================
-    
+
     Returns array of shape (x.shape[:-1] + data.shape[x.shape[-1]:])
-    
+
     For example, assume we have the following 2D image data::
-    
+
         >>> data = np.array([[1,   2,   4  ],
                              [10,  20,  40 ],
                              [100, 200, 400]])
-        
+
     To compute a single interpolated point from this data::
-        
+
         >>> x = np.array([(0.5, 0.5)])
         >>> interpolateArray(data, x)
         array([ 8.25])
-        
+
     To compute a 1D list of interpolated locations:: 
-        
+
         >>> x = np.array([(0.5, 0.5),
                           (1.0, 1.0),
                           (1.0, 2.0),
                           (1.5, 0.0)])
         >>> interpolateArray(data, x)
         array([  8.25,  20.  ,  40.  ,  55.  ])
-        
+
     To compute a 2D array of interpolated locations::
-    
+
         >>> x = np.array([[(0.5, 0.5), (1.0, 2.0)],
                           [(1.0, 1.0), (1.5, 0.0)]])
         >>> interpolateArray(data, x)
         array([[  8.25,  40.  ],
                [ 20.  ,  55.  ]])
-               
+
     ..and so on. The *x* argument may have any shape as long as 
     ```x.shape[-1] <= data.ndim```. In the case that 
     ```x.shape[-1] < data.ndim```, then the remaining axes are simply 
     broadcasted as usual. For example, we can interpolate one location
     from an entire row of the data::
-    
+
         >>> x = np.array([[0.5]])
         >>> interpolateArray(data, x)
         array([[  5.5,  11. ,  22. ]])
@@ -663,7 +673,8 @@ def interpolateArray(data, x, default=0.0, order=1):
     This is useful for interpolating from arrays of colors, vertexes, etc.
     """
     if order not in (0, 1):
-        raise ValueError("interpolateArray requires order=0 or 1 (got %s)" % order)
+        raise ValueError(
+            "interpolateArray requires order=0 or 1 (got %s)" % order)
 
     prof = debug.Profiler()
 
@@ -672,34 +683,37 @@ def interpolateArray(data, x, default=0.0, order=1):
     if md > nd:
         raise TypeError("x.shape[-1] must be less than or equal to data.ndim")
 
-    totalMask = np.ones(x.shape[:-1], dtype=bool) # keep track of out-of-bound indexes
+    # keep track of out-of-bound indexes
+    totalMask = np.ones(x.shape[:-1], dtype=bool)
     if order == 0:
-        xinds = np.round(x).astype(int)  # NOTE: for 0.5 this rounds to the nearest *even* number
+        # NOTE: for 0.5 this rounds to the nearest *even* number
+        xinds = np.round(x).astype(int)
         for ax in range(md):
-            mask = (xinds[...,ax] >= 0) & (xinds[...,ax] <= data.shape[ax]-1) 
-            xinds[...,ax][~mask] = 0
+            mask = (xinds[..., ax] >= 0) & (xinds[..., ax] <= data.shape[ax]-1)
+            xinds[..., ax][~mask] = 0
             # keep track of points that need to be set to default
             totalMask &= mask
-        result = data[tuple([xinds[...,i] for i in range(xinds.shape[-1])])]
-        
+        result = data[tuple([xinds[..., i] for i in range(xinds.shape[-1])])]
+
     elif order == 1:
-        # First we generate arrays of indexes that are needed to 
+        # First we generate arrays of indexes that are needed to
         # extract the data surrounding each point
-        fields = np.mgrid[(slice(0,order+1),) * md]
+        fields = np.mgrid[(slice(0, order+1),) * md]
         xmin = np.floor(x).astype(int)
         xmax = xmin + 1
-        indexes = np.concatenate([xmin[np.newaxis, ...], xmax[np.newaxis, ...]])
+        indexes = np.concatenate(
+            [xmin[np.newaxis, ...], xmax[np.newaxis, ...]])
         fieldInds = []
         for ax in range(md):
-            mask = (xmin[...,ax] >= 0) & (x[...,ax] <= data.shape[ax]-1) 
+            mask = (xmin[..., ax] >= 0) & (x[..., ax] <= data.shape[ax]-1)
             # keep track of points that need to be set to default
             totalMask &= mask
-            
-            # ..and keep track of indexes that are out of bounds 
+
+            # ..and keep track of indexes that are out of bounds
             # (note that when x[...,ax] == data.shape[ax], then xmax[...,ax] will be out
             #  of bounds, but the interpolation will work anyway)
-            mask &= (xmax[...,ax] < data.shape[ax])
-            axisIndex = indexes[...,ax][fields[ax]]
+            mask &= (xmax[..., ax] < data.shape[ax])
+            axisIndex = indexes[..., ax][fields[ax]]
             axisIndex[axisIndex < 0] = 0
             axisIndex[axisIndex >= data.shape[ax]] = 0
             fieldInds.append(axisIndex)
@@ -708,14 +722,14 @@ def interpolateArray(data, x, default=0.0, order=1):
         # Get data values surrounding each requested point
         fieldData = data[tuple(fieldInds)]
         prof()
-    
-        ## Interpolate
+
+        # Interpolate
         s = np.empty((md,) + fieldData.shape, dtype=float)
         dx = x - xmin
         # reshape fields for arithmetic against dx
         for ax in range(md):
             f1 = fields[ax].reshape(fields[ax].shape + (1,)*(dx.ndim-1))
-            sax = f1 * dx[...,ax] + (1-f1) * (1-dx[...,ax])
+            sax = f1 * dx[..., ax] + (1-f1) * (1-dx[..., ax])
             sax = sax.reshape(sax.shape + (1,) * (s.ndim-1-sax.ndim))
             s[ax] = sax
         s = np.product(s, axis=0)
@@ -738,21 +752,21 @@ def interpolateArray(data, x, default=0.0, order=1):
 def subArray(data, offset, shape, stride):
     """
     Unpack a sub-array from *data* using the specified offset, shape, and stride.
-    
+
     Note that *stride* is specified in array elements, not bytes.
     For example, we have a 2x3 array packed in a 1D array as follows::
-    
+
         data = [_, _, 00, 01, 02, _, 10, 11, 12, _]
-        
+
     Then we can unpack the sub-array with this call::
-    
+
         subArray(data, offset=2, shape=(2, 3), stride=(4, 1))
-        
+
     ..which returns::
-    
+
         [[00, 01, 02],
          [10, 11, 12]]
-         
+
     This function operates only on the first axis of *data*. So changing 
     the input in the example above to have shape (10, 7) would cause the
     output to have shape (2, 3, 7).
@@ -766,7 +780,7 @@ def subArray(data, offset, shape, stride):
     for s in stride[1::-1]:
         strides.append(itemsize * s)
     strides = tuple(strides[::-1])
-    
+
     return np.ndarray(buffer=data, shape=shape+extraShape, strides=strides, dtype=data.dtype)
 
 
@@ -774,93 +788,94 @@ def transformToArray(tr):
     """
     Given a QTransform, return a 3x3 numpy array.
     Given a QMatrix4x4, return a 4x4 numpy array.
-    
+
     Example: map an array of x,y coordinates through a transform::
-    
+
         ## coordinates to map are (1,5), (2,6), (3,7), and (4,8)
         coords = np.array([[1,2,3,4], [5,6,7,8], [1,1,1,1]])  # the extra '1' coordinate is needed for translation to work
-        
+
         ## Make an example transform
         tr = QtGui.QTransform()
         tr.translate(3,4)
         tr.scale(2, 0.1)
-        
+
         ## convert to array
         m = pg.transformToArray()[:2]  # ignore the perspective portion of the transformation
-        
+
         ## map coordinates through transform
         mapped = np.dot(m, coords)
     """
-    #return np.array([[tr.m11(), tr.m12(), tr.m13()],[tr.m21(), tr.m22(), tr.m23()],[tr.m31(), tr.m32(), tr.m33()]])
-    ## The order of elements given by the method names m11..m33 is misleading--
-    ## It is most common for x,y translation to occupy the positions 1,3 and 2,3 in
-    ## a transformation matrix. However, with QTransform these values appear at m31 and m32.
-    ## So the correct interpretation is transposed:
+    # return np.array([[tr.m11(), tr.m12(), tr.m13()],[tr.m21(), tr.m22(), tr.m23()],[tr.m31(), tr.m32(), tr.m33()]])
+    # The order of elements given by the method names m11..m33 is misleading--
+    # It is most common for x,y translation to occupy the positions 1,3 and 2,3 in
+    # a transformation matrix. However, with QTransform these values appear at m31 and m32.
+    # So the correct interpretation is transposed:
     if isinstance(tr, QtGui.QTransform):
         return np.array([[tr.m11(), tr.m21(), tr.m31()], [tr.m12(), tr.m22(), tr.m32()], [tr.m13(), tr.m23(), tr.m33()]])
     elif isinstance(tr, QtGui.QMatrix4x4):
-        return np.array(tr.copyDataTo()).reshape(4,4)
+        return np.array(tr.copyDataTo()).reshape(4, 4)
     else:
-        raise Exception("Transform argument must be either QTransform or QMatrix4x4.")
+        raise Exception(
+            "Transform argument must be either QTransform or QMatrix4x4.")
+
 
 def transformCoordinates(tr, coords, transpose=False):
     """
     Map a set of 2D or 3D coordinates through a QTransform or QMatrix4x4.
     The shape of coords must be (2,...) or (3,...)
     The mapping will _ignore_ any perspective transformations.
-    
+
     For coordinate arrays with ndim=2, this is basically equivalent to matrix multiplication.
     Most arrays, however, prefer to put the coordinate axis at the end (eg. shape=(...,3)). To 
     allow this, use transpose=True.
-    
+
     """
-    
+
     if transpose:
-        ## move last axis to beginning. This transposition will be reversed before returning the mapped coordinates.
-        coords = coords.transpose((coords.ndim-1,) + tuple(range(0,coords.ndim-1)))
-    
+        # move last axis to beginning. This transposition will be reversed before returning the mapped coordinates.
+        coords = coords.transpose(
+            (coords.ndim-1,) + tuple(range(0, coords.ndim-1)))
+
     nd = coords.shape[0]
     if isinstance(tr, np.ndarray):
         m = tr
     else:
         m = transformToArray(tr)
         m = m[:m.shape[0]-1]  # remove perspective
-    
-    ## If coords are 3D and tr is 2D, assume no change for Z axis
-    if m.shape == (2,3) and nd == 3:
-        m2 = np.zeros((3,4))
-        m2[:2, :2] = m[:2,:2]
-        m2[:2, 3] = m[:2,2]
-        m2[2,2] = 1
+
+    # If coords are 3D and tr is 2D, assume no change for Z axis
+    if m.shape == (2, 3) and nd == 3:
+        m2 = np.zeros((3, 4))
+        m2[:2, :2] = m[:2, :2]
+        m2[:2, 3] = m[:2, 2]
+        m2[2, 2] = 1
         m = m2
-    
-    ## if coords are 2D and tr is 3D, ignore Z axis
-    if m.shape == (3,4) and nd == 2:
-        m2 = np.empty((2,3))
-        m2[:,:2] = m[:2,:2]
-        m2[:,2] = m[:2,3]
+
+    # if coords are 2D and tr is 3D, ignore Z axis
+    if m.shape == (3, 4) and nd == 2:
+        m2 = np.empty((2, 3))
+        m2[:, :2] = m[:2, :2]
+        m2[:, 2] = m[:2, 3]
         m = m2
-    
-    ## reshape tr and coords to prepare for multiplication
+
+    # reshape tr and coords to prepare for multiplication
     m = m.reshape(m.shape + (1,)*(coords.ndim-1))
     coords = coords[np.newaxis, ...]
-    
-    # separate scale/rotate and translation    
-    translate = m[:,-1]  
-    m = m[:, :-1]
-    
-    ## map coordinates and return
-    mapped = (m*coords).sum(axis=1)  ## apply scale/rotate
-    mapped += translate
-    
-    if transpose:
-        ## move first axis to end.
-        mapped = mapped.transpose(tuple(range(1,mapped.ndim)) + (0,))
-    return mapped
-    
-    
 
-    
+    # separate scale/rotate and translation
+    translate = m[:, -1]
+    m = m[:, :-1]
+
+    # map coordinates and return
+    mapped = (m*coords).sum(axis=1)  # apply scale/rotate
+    mapped += translate
+
+    if transpose:
+        # move first axis to end.
+        mapped = mapped.transpose(tuple(range(1, mapped.ndim)) + (0,))
+    return mapped
+
+
 def solve3DTransform(points1, points2):
     """
     Find a 3D transformation matrix that maps points1 onto points2.
@@ -871,74 +886,81 @@ def solve3DTransform(points1, points2):
     pts = []
     for inp in (points1, points2):
         if isinstance(inp, np.ndarray):
-            A = np.empty((4,4), dtype=float)
-            A[:,:3] = inp[:,:3]
-            A[:,3] = 1.0
+            A = np.empty((4, 4), dtype=float)
+            A[:, :3] = inp[:, :3]
+            A[:, 3] = 1.0
         else:
-            A = np.array([[inp[i].x(), inp[i].y(), inp[i].z(), 1] for i in range(4)])
+            A = np.array([[inp[i].x(), inp[i].y(), inp[i].z(), 1]
+                          for i in range(4)])
         pts.append(A)
-    
-    ## solve 3 sets of linear equations to determine transformation matrix elements
-    matrix = np.zeros((4,4))
+
+    # solve 3 sets of linear equations to determine transformation matrix elements
+    matrix = np.zeros((4, 4))
     for i in range(3):
-        ## solve Ax = B; x is one row of the desired transformation matrix
-        matrix[i] = numpy.linalg.solve(pts[0], pts[1][:,i])  
-    
+        # solve Ax = B; x is one row of the desired transformation matrix
+        matrix[i] = numpy.linalg.solve(pts[0], pts[1][:, i])
+
     return matrix
-    
+
+
 def solveBilinearTransform(points1, points2):
     """
     Find a bilinear transformation matrix (2x4) that maps points1 onto points2.
     Points must be specified as a list of 4 Vector, Point, QPointF, etc.
-    
+
     To use this matrix to map a point [x,y]::
-    
+
         mapped = np.dot(matrix, [x*y, x, y, 1])
     """
     import numpy.linalg
-    ## A is 4 rows (points) x 4 columns (xy, x, y, 1)
-    ## B is 4 rows (points) x 2 columns (x, y)
-    A = np.array([[points1[i].x()*points1[i].y(), points1[i].x(), points1[i].y(), 1] for i in range(4)])
+    # A is 4 rows (points) x 4 columns (xy, x, y, 1)
+    # B is 4 rows (points) x 2 columns (x, y)
+    A = np.array([[points1[i].x()*points1[i].y(), points1[i].x(),
+                   points1[i].y(), 1] for i in range(4)])
     B = np.array([[points2[i].x(), points2[i].y()] for i in range(4)])
-    
-    ## solve 2 sets of linear equations to determine transformation matrix elements
-    matrix = np.zeros((2,4))
+
+    # solve 2 sets of linear equations to determine transformation matrix elements
+    matrix = np.zeros((2, 4))
     for i in range(2):
-        matrix[i] = numpy.linalg.solve(A, B[:,i])  ## solve Ax = B; x is one row of the desired transformation matrix
-    
+        # solve Ax = B; x is one row of the desired transformation matrix
+        matrix[i] = numpy.linalg.solve(A, B[:, i])
+
     return matrix
-    
+
+
 def rescaleData(data, scale, offset, dtype=None, clip=None):
     """Return data rescaled and optionally cast to a new dtype::
-    
+
         data => (data-offset) * scale
-        
+
     """
     if dtype is None:
         dtype = data.dtype
     else:
         dtype = np.dtype(dtype)
-    
+
     try:
         if not getConfigOption('useWeave'):
-            raise Exception('Weave is disabled; falling back to slower version.')
+            raise Exception(
+                'Weave is disabled; falling back to slower version.')
         try:
             import scipy.weave
         except ImportError:
-            raise Exception('scipy.weave is not importable; falling back to slower version.')
-        
-        ## require native dtype when using weave
+            raise Exception(
+                'scipy.weave is not importable; falling back to slower version.')
+
+        # require native dtype when using weave
         if not data.dtype.isnative:
             data = data.astype(data.dtype.newbyteorder('='))
         if not dtype.isnative:
             weaveDtype = dtype.newbyteorder('=')
         else:
             weaveDtype = dtype
-        
+
         newData = np.empty((data.size,), dtype=weaveDtype)
         flat = np.ascontiguousarray(data).reshape(data.size)
         size = data.size
-        
+
         code = """
         double sc = (double)scale;
         double off = (double)offset;
@@ -946,7 +968,8 @@ def rescaleData(data, scale, offset, dtype=None, clip=None):
             newData[i] = ((double)flat[i] - off) * sc;
         }
         """
-        scipy.weave.inline(code, ['flat', 'newData', 'size', 'offset', 'scale'], compiler='gcc')
+        scipy.weave.inline(
+            code, ['flat', 'newData', 'size', 'offset', 'scale'], compiler='gcc')
         if dtype != weaveDtype:
             newData = newData.astype(dtype)
         data = newData.reshape(data.shape)
@@ -955,12 +978,12 @@ def rescaleData(data, scale, offset, dtype=None, clip=None):
             if getConfigOption('weaveDebug'):
                 debug.printExc("Error; disabling weave.")
             setConfigOptions(useWeave=False)
-        
+
         #p = np.poly1d([scale, -offset*scale])
         #d2 = p(data)
         d2 = data - float(offset)
         d2 *= scale
-        
+
         # Clip before converting dtype to avoid overflow
         if dtype.kind in 'ui':
             lim = np.iinfo(dtype)
@@ -974,19 +997,20 @@ def rescaleData(data, scale, offset, dtype=None, clip=None):
                 d2 = np.clip(d2, *clip)
         data = d2.astype(dtype)
     return data
-    
+
+
 def applyLookupTable(data, lut):
     """
     Uses values in *data* as indexes to select values from *lut*.
     The returned data has shape data.shape + lut.shape[1:]
-    
+
     Note: color gradient lookup tables can be generated using GradientWidget.
     """
     if data.dtype.kind not in ('i', 'u'):
         data = data.astype(int)
-    
-    return np.take(lut, data, axis=0, mode='clip')  
-    
+
+    return np.take(lut, data, axis=0, mode='clip')
+
 
 def makeRGBA(*args, **kwds):
     """Equivalent to makeARGB(..., useRGBA=True)"""
@@ -994,28 +1018,28 @@ def makeRGBA(*args, **kwds):
     return makeARGB(*args, **kwds)
 
 
-def makeARGB(data, lut=None, levels=None, scale=None, useRGBA=False): 
+def makeARGB(data, lut=None, levels=None, scale=None, useRGBA=False):
     """ 
     Convert an array of values into an ARGB array suitable for building QImages,
     OpenGL textures, etc.
-    
+
     Returns the ARGB array (unsigned byte) and a boolean indicating whether
     there is alpha channel data. This is a two stage process:
-    
+
         1) Rescale the data based on the values in the *levels* argument (min, max).
         2) Determine the final output by passing the rescaled values through a
            lookup table.
-   
+
     Both stages are optional.
-    
+
     ============== ==================================================================================
     **Arguments:**
     data           numpy array of int/float types. If 
     levels         List [min, max]; optionally rescale data before converting through the
                    lookup table. The data is rescaled such that min->0 and max->*scale*::
-                   
+
                       rescaled = (clip(data, min, max) - min) * (*scale* / (max - min))
-                   
+
                    It is also possible to use a 2D (N,2) array of values for levels. In this case,
                    it is assumed that each pair of min,max values in the levels array should be 
                    applied to a different subset of the input data (for example, the input data may 
@@ -1040,10 +1064,10 @@ def makeARGB(data, lut=None, levels=None, scale=None, useRGBA=False):
         raise TypeError("data must be 2D or 3D")
     if data.ndim == 3 and data.shape[2] > 4:
         raise TypeError("data.shape[2] must be <= 4")
-    
+
     if lut is not None and not isinstance(lut, np.ndarray):
         lut = np.array(lut)
-    
+
     if levels is None:
         # automatically decide levels based on data dtype
         if data.dtype.kind == 'u':
@@ -1052,9 +1076,10 @@ def makeARGB(data, lut=None, levels=None, scale=None, useRGBA=False):
             s = 2**(data.itemsize*8 - 1)
             levels = np.array([-s, s-1])
         elif data.dtype.kind == 'b':
-            levels = np.array([0,1])
+            levels = np.array([0, 1])
         else:
-            raise Exception('levels argument is required for float input types')
+            raise Exception(
+                'levels argument is required for float input types')
     if not isinstance(levels, np.ndarray):
         levels = np.array(levels)
     if levels.ndim == 1:
@@ -1062,11 +1087,13 @@ def makeARGB(data, lut=None, levels=None, scale=None, useRGBA=False):
             raise Exception('levels argument must have length 2')
     elif levels.ndim == 2:
         if lut is not None and lut.ndim > 1:
-            raise Exception('Cannot make ARGB data when both levels and lut have ndim > 2')
+            raise Exception(
+                'Cannot make ARGB data when both levels and lut have ndim > 2')
         if levels.shape != (data.shape[-1], 2):
             raise Exception('levels must have shape (data.shape[-1], 2)')
     else:
-        raise Exception("levels argument must be 1D or 2D (got shape=%s)." % repr(levels.shape))
+        raise Exception(
+            "levels argument must be 1D or 2D (got shape=%s)." % repr(levels.shape))
 
     profile()
 
@@ -1082,13 +1109,14 @@ def makeARGB(data, lut=None, levels=None, scale=None, useRGBA=False):
         dtype = np.ubyte
     else:
         dtype = np.min_scalar_type(lut.shape[0]-1)
-            
+
     # Apply levels if given
     if levels is not None:
         if isinstance(levels, np.ndarray) and levels.ndim == 2:
             # we are going to rescale each channel independently
             if levels.shape[0] != data.shape[-1]:
-                raise Exception("When rescaling multi-channel data, there must be the same number of levels as channels (data.shape[-1] == levels.shape[0])")
+                raise Exception(
+                    "When rescaling multi-channel data, there must be the same number of levels as channels (data.shape[-1] == levels.shape[0])")
             newData = np.empty(data.shape, dtype=int)
             for i in range(data.shape[-1]):
                 minVal, maxVal = levels[i]
@@ -1096,7 +1124,8 @@ def makeARGB(data, lut=None, levels=None, scale=None, useRGBA=False):
                     maxVal += 1e-16
                 rng = maxVal-minVal
                 rng = 1 if rng == 0 else rng
-                newData[...,i] = rescaleData(data[...,i], scale / rng, minVal, dtype=dtype)
+                newData[..., i] = rescaleData(
+                    data[..., i], scale / rng, minVal, dtype=dtype)
             data = newData
         else:
             # Apply level scaling unless it would have no effect on the data
@@ -1104,8 +1133,8 @@ def makeARGB(data, lut=None, levels=None, scale=None, useRGBA=False):
             if minVal != 0 or maxVal != scale:
                 if minVal == maxVal:
                     maxVal += 1e-16
-                data = rescaleData(data, scale/(maxVal-minVal), minVal, dtype=dtype)
-            
+                data = rescaleData(
+                    data, scale/(maxVal-minVal), minVal, dtype=dtype)
 
     profile()
 
@@ -1125,10 +1154,11 @@ def makeARGB(data, lut=None, levels=None, scale=None, useRGBA=False):
 
     # decide channel order
     if useRGBA:
-        order = [0,1,2,3] # array comes out RGBA
+        order = [0, 1, 2, 3]  # array comes out RGBA
     else:
-        order = [2,1,0,3] # for some reason, the colors line up as BGR in the final image.
-        
+        # for some reason, the colors line up as BGR in the final image.
+        order = [2, 1, 0, 3]
+
     # copy data into image array
     if data.ndim == 2:
         # This is tempting:
@@ -1141,17 +1171,17 @@ def makeARGB(data, lut=None, levels=None, scale=None, useRGBA=False):
             imgData[..., i] = data[..., 0]
     else:
         for i in range(0, data.shape[2]):
-            imgData[..., i] = data[..., order[i]] 
-        
+            imgData[..., i] = data[..., order[i]]
+
     profile()
-    
+
     # add opaque alpha channel if needed
     if data.ndim == 2 or data.shape[2] == 3:
         alpha = False
         imgData[..., 3] = 255
     else:
         alpha = True
-        
+
     profile()
     return imgData, alpha
 
@@ -1163,7 +1193,7 @@ def makeQImage(imgData, alpha=None, copy=True, transpose=True):
     be reflected in the image. The image will be given a 'data' attribute
     pointing to the array which shares its data to prevent python
     freeing that memory while the image is in use.
-    
+
     ============== ===================================================================
     **Arguments:**
     imgData        Array of data to convert. Must have shape (width, height, 3 or 4) 
@@ -1182,92 +1212,100 @@ def makeQImage(imgData, alpha=None, copy=True, transpose=True):
                    opposite.
     ============== ===================================================================    
     """
-    ## create QImage from buffer
+    # create QImage from buffer
     profile = debug.Profiler()
-    
-    ## If we didn't explicitly specify alpha, check the array shape.
+
+    # If we didn't explicitly specify alpha, check the array shape.
     if alpha is None:
         alpha = (imgData.shape[2] == 4)
-        
+
     copied = False
-    if imgData.shape[2] == 3:  ## need to make alpha channel (even if alpha==False; QImage requires 32 bpp)
+    # need to make alpha channel (even if alpha==False; QImage requires 32 bpp)
+    if imgData.shape[2] == 3:
         if copy is True:
             d2 = np.empty(imgData.shape[:2] + (4,), dtype=imgData.dtype)
-            d2[:,:,:3] = imgData
-            d2[:,:,3] = 255
+            d2[:, :, :3] = imgData
+            d2[:, :, 3] = 255
             imgData = d2
             copied = True
         else:
-            raise Exception('Array has only 3 channels; cannot make QImage without copying.')
-    
+            raise Exception(
+                'Array has only 3 channels; cannot make QImage without copying.')
+
     if alpha:
         imgFormat = QtGui.QImage.Format_ARGB32
     else:
         imgFormat = QtGui.QImage.Format_RGB32
-        
+
     if transpose:
-        imgData = imgData.transpose((1, 0, 2))  ## QImage expects the row/column order to be opposite
+        # QImage expects the row/column order to be opposite
+        imgData = imgData.transpose((1, 0, 2))
 
     profile()
 
     if not imgData.flags['C_CONTIGUOUS']:
         if copy is False:
             extra = ' (try setting transpose=False)' if transpose else ''
-            raise Exception('Array is not contiguous; cannot make QImage without copying.'+extra)
+            raise Exception(
+                'Array is not contiguous; cannot make QImage without copying.'+extra)
         imgData = np.ascontiguousarray(imgData)
         copied = True
-        
+
     if copy is True and copied is False:
         imgData = imgData.copy()
-        
+
     if QT_LIB in ['PySide', 'PySide2']:
         ch = ctypes.c_char.from_buffer(imgData, 0)
-        
-        # Bug in PySide + Python 3 causes refcount for image data to be improperly 
+
+        # Bug in PySide + Python 3 causes refcount for image data to be improperly
         # incremented, which leads to leaked memory. As a workaround, we manually
         # reset the reference count after creating the QImage.
         # See: https://bugreports.qt.io/browse/PYSIDE-140
-        
+
         # Get initial reference count (PyObject struct has ob_refcnt as first element)
         rcount = ctypes.c_long.from_address(id(ch)).value
         img = QtGui.QImage(ch, imgData.shape[1], imgData.shape[0], imgFormat)
         if sys.version[0] == '3':
             # Reset refcount only on python 3. Technically this would have no effect
-            # on python 2, but this is a nasty hack, and checking for version here 
+            # on python 2, but this is a nasty hack, and checking for version here
             # helps to mitigate possible unforseen consequences.
             ctypes.c_long.from_address(id(ch)).value = rcount
     else:
         #addr = ctypes.addressof(ctypes.c_char.from_buffer(imgData, 0))
-        ## PyQt API for QImage changed between 4.9.3 and 4.9.6 (I don't know exactly which version it was)
-        ## So we first attempt the 4.9.6 API, then fall back to 4.9.3
+        # PyQt API for QImage changed between 4.9.3 and 4.9.6 (I don't know exactly which version it was)
+        # So we first attempt the 4.9.6 API, then fall back to 4.9.3
         #addr = ctypes.c_char.from_buffer(imgData, 0)
-        #try:
+        # try:
             #img = QtGui.QImage(addr, imgData.shape[1], imgData.shape[0], imgFormat)
-        #except TypeError:  
+        # except TypeError:
             #addr = ctypes.addressof(addr)
             #img = QtGui.QImage(addr, imgData.shape[1], imgData.shape[0], imgFormat)
         try:
-            img = QtGui.QImage(imgData.ctypes.data, imgData.shape[1], imgData.shape[0], imgFormat)
+            img = QtGui.QImage(imgData.ctypes.data,
+                               imgData.shape[1], imgData.shape[0], imgFormat)
         except:
             if copy:
                 # does not leak memory, is not mutable
-                img = QtGui.QImage(buffer(imgData), imgData.shape[1], imgData.shape[0], imgFormat)
+                img = QtGui.QImage(
+                    buffer(imgData), imgData.shape[1], imgData.shape[0], imgFormat)
             else:
                 # mutable, but leaks memory
-                img = QtGui.QImage(memoryview(imgData), imgData.shape[1], imgData.shape[0], imgFormat)
-                
+                img = QtGui.QImage(memoryview(
+                    imgData), imgData.shape[1], imgData.shape[0], imgFormat)
+
     img.data = imgData
     return img
-    #try:
-        #buf = imgData.data
-    #except AttributeError:  ## happens when image data is non-contiguous
-        #buf = imgData.data
-        
-    #profiler()
+    # try:
+    #buf = imgData.data
+    # except AttributeError:  ## happens when image data is non-contiguous
+    #buf = imgData.data
+
+    # profiler()
     #qimage = QtGui.QImage(buf, imgData.shape[1], imgData.shape[0], imgFormat)
-    #profiler()
+    # profiler()
     #qimage.data = imgData
-    #return qimage
+    # return qimage
+
 
 def imageToArray(img, copy=False, transpose=True):
     """
@@ -1287,103 +1325,109 @@ def imageToArray(img, copy=False, transpose=True):
             # Required for Python 2.6, PyQt 4.10
             # If this works on all platforms, then there is no need to use np.asarray..
             arr = np.frombuffer(ptr, np.ubyte, img.byteCount())
-    
+
     arr = arr.reshape(img.height(), img.width(), 4)
     if fmt == img.Format_RGB32:
-        arr[...,3] = 255
-    
+        arr[..., 3] = 255
+
     if copy:
         arr = arr.copy()
-        
+
     if transpose:
-        return arr.transpose((1,0,2))
+        return arr.transpose((1, 0, 2))
     else:
         return arr
-    
+
+
 def colorToAlpha(data, color):
     """
     Given an RGBA image in *data*, convert *color* to be transparent. 
     *data* must be an array (w, h, 3 or 4) of ubyte values and *color* must be 
     an array (3) of ubyte values.
     This is particularly useful for use with images that have a black or white background.
-    
+
     Algorithm is taken from Gimp's color-to-alpha function in plug-ins/common/colortoalpha.c
     Credit:
         /*
         * Color To Alpha plug-in v1.0 by Seth Burgess, sjburges@gimp.org 1999/05/14
         *  with algorithm by clahey
         */
-    
+
     """
     data = data.astype(float)
-    if data.shape[-1] == 3:  ## add alpha channel if needed
+    if data.shape[-1] == 3:  # add alpha channel if needed
         d2 = np.empty(data.shape[:2]+(4,), dtype=data.dtype)
-        d2[...,:3] = data
-        d2[...,3] = 255
+        d2[..., :3] = data
+        d2[..., 3] = 255
         data = d2
-    
+
     color = color.astype(float)
     alpha = np.zeros(data.shape[:2]+(3,), dtype=float)
     output = data.copy()
-    
-    for i in [0,1,2]:
-        d = data[...,i]
+
+    for i in [0, 1, 2]:
+        d = data[..., i]
         c = color[i]
         mask = d > c
-        alpha[...,i][mask] = (d[mask] - c) / (255. - c)
+        alpha[..., i][mask] = (d[mask] - c) / (255. - c)
         imask = d < c
-        alpha[...,i][imask] = (c - d[imask]) / c
-    
-    output[...,3] = alpha.max(axis=2) * 255.
-    
-    mask = output[...,3] >= 1.0  ## avoid zero division while processing alpha channel
-    correction = 255. / output[...,3][mask]  ## increase value to compensate for decreased alpha
-    for i in [0,1,2]:
-        output[...,i][mask] = ((output[...,i][mask]-color[i]) * correction) + color[i]
-        output[...,3][mask] *= data[...,3][mask] / 255.  ## combine computed and previous alpha values
-    
+        alpha[..., i][imask] = (c - d[imask]) / c
+
+    output[..., 3] = alpha.max(axis=2) * 255.
+
+    # avoid zero division while processing alpha channel
+    mask = output[..., 3] >= 1.0
+    # increase value to compensate for decreased alpha
+    correction = 255. / output[..., 3][mask]
+    for i in [0, 1, 2]:
+        output[..., i][mask] = (
+            (output[..., i][mask]-color[i]) * correction) + color[i]
+        output[..., 3][mask] *= data[..., 3][mask] / \
+            255.  # combine computed and previous alpha values
+
     #raise Exception()
     return np.clip(output, 0, 255).astype(np.ubyte)
+
 
 def gaussianFilter(data, sigma):
     """
     Drop-in replacement for scipy.ndimage.gaussian_filter.
-    
+
     (note: results are only approximately equal to the output of
      gaussian_filter)
     """
     if np.isscalar(sigma):
         sigma = (sigma,) * data.ndim
-        
+
     baseline = data.mean()
     filtered = data - baseline
     for ax in range(data.ndim):
         s = sigma[ax]
         if s == 0:
             continue
-        
+
         # generate 1D gaussian kernel
         ksize = int(s * 6)
         x = np.arange(-ksize, ksize)
         kernel = np.exp(-x**2 / (2*s**2))
-        kshape = [1,] * data.ndim
+        kshape = [1, ] * data.ndim
         kshape[ax] = len(kernel)
         kernel = kernel.reshape(kshape)
-        
+
         # convolve as product of FFTs
         shape = data.shape[ax] + ksize
         scale = 1.0 / (abs(s) * (2*np.pi)**0.5)
-        filtered = scale * np.fft.irfft(np.fft.rfft(filtered, shape, axis=ax) * 
-                                        np.fft.rfft(kernel, shape, axis=ax), 
+        filtered = scale * np.fft.irfft(np.fft.rfft(filtered, shape, axis=ax) *
+                                        np.fft.rfft(kernel, shape, axis=ax),
                                         axis=ax)
-        
+
         # clip off extra data
         sl = [slice(None)] * data.ndim
-        sl[ax] = slice(filtered.shape[ax]-data.shape[ax],None,None)
+        sl[ax] = slice(filtered.shape[ax]-data.shape[ax], None, None)
         filtered = filtered[sl]
     return filtered + baseline
-    
-    
+
+
 def downsample(data, n, axis=0, xvals='subsample'):
     """Downsample by averaging points together across axis.
     If multiple axes are specified, runs once per axis.
@@ -1394,15 +1438,14 @@ def downsample(data, n, axis=0, xvals='subsample'):
     if (hasattr(data, 'implements') and data.implements('MetaArray')):
         ma = data
         data = data.view(np.ndarray)
-        
-    
+
     if hasattr(axis, '__len__'):
         if not hasattr(n, '__len__'):
             n = [n]*len(axis)
         for i in range(len(axis)):
             data = downsample(data, n[i], axis[i])
         return data
-    
+
     if n <= 1:
         return data
     nPts = int(data.shape[axis] / n)
@@ -1412,10 +1455,10 @@ def downsample(data, n, axis=0, xvals='subsample'):
     sl = [slice(None)] * data.ndim
     sl[axis] = slice(0, nPts*n)
     d1 = data[tuple(sl)]
-    #print d1.shape, s
+    # print d1.shape, s
     d1.shape = tuple(s)
     d2 = d1.mean(axis+1)
-    
+
     if ma is None:
         return d2
     else:
@@ -1436,37 +1479,37 @@ def arrayToQPath(x, y, connect='all'):
     connections.
     """
 
-    ## Create all vertices in path. The method used below creates a binary format so that all
-    ## vertices can be read in at once. This binary format may change in future versions of Qt,
-    ## so the original (slower) method is left here for emergencies:
-        #path.moveTo(x[0], y[0])
-        #if connect == 'all':
-            #for i in range(1, y.shape[0]):
-                #path.lineTo(x[i], y[i])
-        #elif connect == 'pairs':
-            #for i in range(1, y.shape[0]):
-                #if i%2 == 0:
-                    #path.lineTo(x[i], y[i])
-                #else:
-                    #path.moveTo(x[i], y[i])
-        #elif isinstance(connect, np.ndarray):
-            #for i in range(1, y.shape[0]):
-                #if connect[i] == 1:
-                    #path.lineTo(x[i], y[i])
-                #else:
-                    #path.moveTo(x[i], y[i])
-        #else:
-            #raise Exception('connect argument must be "all", "pairs", or array')
+    # Create all vertices in path. The method used below creates a binary format so that all
+    # vertices can be read in at once. This binary format may change in future versions of Qt,
+    # so the original (slower) method is left here for emergencies:
+    #path.moveTo(x[0], y[0])
+    # if connect == 'all':
+    # for i in range(1, y.shape[0]):
+    #path.lineTo(x[i], y[i])
+    # elif connect == 'pairs':
+    # for i in range(1, y.shape[0]):
+    # if i%2 == 0:
+    #path.lineTo(x[i], y[i])
+    # else:
+    #path.moveTo(x[i], y[i])
+    # elif isinstance(connect, np.ndarray):
+    # for i in range(1, y.shape[0]):
+    # if connect[i] == 1:
+    #path.lineTo(x[i], y[i])
+    # else:
+    #path.moveTo(x[i], y[i])
+    # else:
+    #raise Exception('connect argument must be "all", "pairs", or array')
 
-    ## Speed this up using >> operator
-    ## Format is:
-    ##    numVerts(i4)   0(i4)
-    ##    x(f8)   y(f8)   0(i4)    <-- 0 means this vertex does not connect
-    ##    x(f8)   y(f8)   1(i4)    <-- 1 means this vertex connects to the previous vertex
-    ##    ...
-    ##    0(i4)
+    # Speed this up using >> operator
+    # Format is:
+    # numVerts(i4)   0(i4)
+    # x(f8)   y(f8)   0(i4)    <-- 0 means this vertex does not connect
+    # x(f8)   y(f8)   1(i4)    <-- 1 means this vertex connects to the previous vertex
+    # ...
+    # 0(i4)
     ##
-    ## All values are big endian--pack using struct.pack('>d') or struct.pack('>i')
+    # All values are big endian--pack using struct.pack('>d') or struct.pack('>i')
 
     path = QtGui.QPainterPath()
 
@@ -1495,19 +1538,20 @@ def arrayToQPath(x, y, connect='all'):
     elif isinstance(connect, np.ndarray):
         arr[1:-1]['c'] = connect
     else:
-        raise Exception('connect argument must be "all", "pairs", "finite", or array')
+        raise Exception(
+            'connect argument must be "all", "pairs", "finite", or array')
 
     #profiler('fill array')
     # write last 0
     lastInd = 20*(n+1)
     byteview.data[lastInd:lastInd+4] = struct.pack('>i', 0)
-    #profiler('footer')
+    # profiler('footer')
     # create datastream object and stream into path
 
-    ## Avoiding this method because QByteArray(str) leaks memory in PySide
-    #buf = QtCore.QByteArray(arr.data[12:lastInd+4])  # I think one unnecessary copy happens here
+    # Avoiding this method because QByteArray(str) leaks memory in PySide
+    # buf = QtCore.QByteArray(arr.data[12:lastInd+4])  # I think one unnecessary copy happens here
 
-    path.strn = byteview.data[12:lastInd+4] # make sure data doesn't run away
+    path.strn = byteview.data[12:lastInd+4]  # make sure data doesn't run away
     try:
         buf = QtCore.QByteArray.fromRawData(path.strn)
     except TypeError:
@@ -1516,101 +1560,99 @@ def arrayToQPath(x, y, connect='all'):
     ds = QtCore.QDataStream(buf)
 
     ds >> path
-    #profiler('load')
+    # profiler('load')
 
     return path
 
-#def isosurface(data, level):
-    #"""
-    #Generate isosurface from volumetric data using marching tetrahedra algorithm.
-    #See Paul Bourke, "Polygonising a Scalar Field Using Tetrahedrons"  (http://local.wasp.uwa.edu.au/~pbourke/geometry/polygonise/)
-    
-    #*data*   3D numpy array of scalar values
-    #*level*  The level at which to generate an isosurface
-    #"""
-    
+# def isosurface(data, level):
+    # """
+    # Generate isosurface from volumetric data using marching tetrahedra algorithm.
+    # See Paul Bourke, "Polygonising a Scalar Field Using Tetrahedrons"  (http://local.wasp.uwa.edu.au/~pbourke/geometry/polygonise/)
+
+    # *data*   3D numpy array of scalar values
+    # *level*  The level at which to generate an isosurface
+    # """
+
     #facets = []
-    
-    ### mark everything below the isosurface level
+
+    # mark everything below the isosurface level
     #mask = data < level
-    
-    #### make eight sub-fields 
+
+    # make eight sub-fields
     #fields = np.empty((2,2,2), dtype=object)
     #slices = [slice(0,-1), slice(1,None)]
-    #for i in [0,1]:
-        #for j in [0,1]:
-            #for k in [0,1]:
-                #fields[i,j,k] = mask[slices[i], slices[j], slices[k]]
-    
-    
-    
-    ### split each cell into 6 tetrahedra
-    ### these all have the same 'orienation'; points 1,2,3 circle 
-    ### clockwise around point 0
-    #tetrahedra = [
-        #[(0,1,0), (1,1,1), (0,1,1), (1,0,1)],
-        #[(0,1,0), (0,1,1), (0,0,1), (1,0,1)],
-        #[(0,1,0), (0,0,1), (0,0,0), (1,0,1)],
-        #[(0,1,0), (0,0,0), (1,0,0), (1,0,1)],
-        #[(0,1,0), (1,0,0), (1,1,0), (1,0,1)],
-        #[(0,1,0), (1,1,0), (1,1,1), (1,0,1)]
-    #]
-    
-    ### each tetrahedron will be assigned an index
-    ### which determines how to generate its facets.
-    ### this structure is: 
-    ###    facets[index][facet1, facet2, ...]
-    ### where each facet is triangular and its points are each 
-    ### interpolated between two points on the tetrahedron
-    ###    facet = [(p1a, p1b), (p2a, p2b), (p3a, p3b)]
-    ### facet points always circle clockwise if you are looking 
-    ### at them from below the isosurface.
-    #indexFacets = [
-        #[],  ## all above
-        #[[(0,1), (0,2), (0,3)]],  # 0 below
-        #[[(1,0), (1,3), (1,2)]],   # 1 below
-        #[[(0,2), (1,3), (1,2)], [(0,2), (0,3), (1,3)]],   # 0,1 below
-        #[[(2,0), (2,1), (2,3)]],   # 2 below
-        #[[(0,3), (1,2), (2,3)], [(0,3), (0,1), (1,2)]],   # 0,2 below
-        #[[(1,0), (2,3), (2,0)], [(1,0), (1,3), (2,3)]],   # 1,2 below
-        #[[(3,0), (3,1), (3,2)]],   # 3 above
-        #[[(3,0), (3,2), (3,1)]],   # 3 below
-        #[[(1,0), (2,0), (2,3)], [(1,0), (2,3), (1,3)]],   # 0,3 below
-        #[[(0,3), (2,3), (1,2)], [(0,3), (1,2), (0,1)]],   # 1,3 below
-        #[[(2,0), (2,3), (2,1)]], # 0,1,3 below
-        #[[(0,2), (1,2), (1,3)], [(0,2), (1,3), (0,3)]],   # 2,3 below
-        #[[(1,0), (1,2), (1,3)]], # 0,2,3 below
-        #[[(0,1), (0,3), (0,2)]], # 1,2,3 below
-        #[]  ## all below
-    #]
-    
-    #for tet in tetrahedra:
-        
-        ### get the 4 fields for this tetrahedron
-        #tetFields = [fields[c] for c in tet]
-        
-        ### generate an index for each grid cell
-        #index = tetFields[0] + tetFields[1]*2 + tetFields[2]*4 + tetFields[3]*8
-        
-        ### add facets
-        #for i in xrange(index.shape[0]):                 # data x-axis
-            #for j in xrange(index.shape[1]):             # data y-axis
-                #for k in xrange(index.shape[2]):         # data z-axis
-                    #for f in indexFacets[index[i,j,k]]:  # faces to generate for this tet
-                        #pts = []
-                        #for l in [0,1,2]:      # points in this face
-                            #p1 = tet[f[l][0]]  # tet corner 1
-                            #p2 = tet[f[l][1]]  # tet corner 2
-                            #pts.append([(p1[x]+p2[x])*0.5+[i,j,k][x]+0.5 for x in [0,1,2]]) ## interpolate between tet corners
-                        #facets.append(pts)
+    # for i in [0,1]:
+    # for j in [0,1]:
+    # for k in [0,1]:
+    #fields[i,j,k] = mask[slices[i], slices[j], slices[k]]
 
-    #return facets
-    
+    # split each cell into 6 tetrahedra
+    # these all have the same 'orienation'; points 1,2,3 circle
+    # clockwise around point 0
+    # tetrahedra = [
+    #[(0,1,0), (1,1,1), (0,1,1), (1,0,1)],
+    #[(0,1,0), (0,1,1), (0,0,1), (1,0,1)],
+    #[(0,1,0), (0,0,1), (0,0,0), (1,0,1)],
+    #[(0,1,0), (0,0,0), (1,0,0), (1,0,1)],
+    #[(0,1,0), (1,0,0), (1,1,0), (1,0,1)],
+    #[(0,1,0), (1,1,0), (1,1,1), (1,0,1)]
+    # ]
+
+    # each tetrahedron will be assigned an index
+    # which determines how to generate its facets.
+    # this structure is:
+    ###    facets[index][facet1, facet2, ...]
+    # where each facet is triangular and its points are each
+    # interpolated between two points on the tetrahedron
+    ###    facet = [(p1a, p1b), (p2a, p2b), (p3a, p3b)]
+    # facet points always circle clockwise if you are looking
+    # at them from below the isosurface.
+    # indexFacets = [
+    # [],  ## all above
+    # [[(0,1), (0,2), (0,3)]],  # 0 below
+    # [[(1,0), (1,3), (1,2)]],   # 1 below
+    # [[(0,2), (1,3), (1,2)], [(0,2), (0,3), (1,3)]],   # 0,1 below
+    # [[(2,0), (2,1), (2,3)]],   # 2 below
+    # [[(0,3), (1,2), (2,3)], [(0,3), (0,1), (1,2)]],   # 0,2 below
+    # [[(1,0), (2,3), (2,0)], [(1,0), (1,3), (2,3)]],   # 1,2 below
+    # [[(3,0), (3,1), (3,2)]],   # 3 above
+    # [[(3,0), (3,2), (3,1)]],   # 3 below
+    # [[(1,0), (2,0), (2,3)], [(1,0), (2,3), (1,3)]],   # 0,3 below
+    # [[(0,3), (2,3), (1,2)], [(0,3), (1,2), (0,1)]],   # 1,3 below
+    # [[(2,0), (2,3), (2,1)]], # 0,1,3 below
+    # [[(0,2), (1,2), (1,3)], [(0,2), (1,3), (0,3)]],   # 2,3 below
+    # [[(1,0), (1,2), (1,3)]], # 0,2,3 below
+    # [[(0,1), (0,3), (0,2)]], # 1,2,3 below
+    # []  ## all below
+    # ]
+
+    # for tet in tetrahedra:
+
+    # get the 4 fields for this tetrahedron
+    #tetFields = [fields[c] for c in tet]
+
+    # generate an index for each grid cell
+    #index = tetFields[0] + tetFields[1]*2 + tetFields[2]*4 + tetFields[3]*8
+
+    # add facets
+    # for i in xrange(index.shape[0]):                 # data x-axis
+    # for j in xrange(index.shape[1]):             # data y-axis
+    # for k in xrange(index.shape[2]):         # data z-axis
+    # for f in indexFacets[index[i,j,k]]:  # faces to generate for this tet
+    #pts = []
+    # for l in [0,1,2]:      # points in this face
+    # p1 = tet[f[l][0]]  # tet corner 1
+    # p2 = tet[f[l][1]]  # tet corner 2
+    # pts.append([(p1[x]+p2[x])*0.5+[i,j,k][x]+0.5 for x in [0,1,2]]) ## interpolate between tet corners
+    # facets.append(pts)
+
+    # return facets
+
 
 def isocurve(data, level, connected=False, extendToEdge=False, path=False):
     """
     Generate isocurve from 2D data using marching squares algorithm.
-    
+
     ============== =========================================================
     **Arguments:**
     data           2D numpy array of scalar values
@@ -1624,13 +1666,13 @@ def isocurve(data, level, connected=False, extendToEdge=False, path=False):
     path           if True, return a QPainterPath rather than a list of 
                    vertex coordinates. This forces connected=True.
     ============== =========================================================
-    
+
     This function is SLOW; plenty of room for optimization here.
-    """    
-    
+    """
+
     if path is True:
         connected = True
-    
+
     if extendToEdge:
         d2 = np.empty((data.shape[0]+2, data.shape[1]+2), dtype=data.dtype)
         d2[1:-1, 1:-1] = data
@@ -1638,171 +1680,177 @@ def isocurve(data, level, connected=False, extendToEdge=False, path=False):
         d2[-1, 1:-1] = data[-1]
         d2[1:-1, 0] = data[:, 0]
         d2[1:-1, -1] = data[:, -1]
-        d2[0,0] = d2[0,1]
-        d2[0,-1] = d2[1,-1]
-        d2[-1,0] = d2[-1,1]
-        d2[-1,-1] = d2[-1,-2]
+        d2[0, 0] = d2[0, 1]
+        d2[0, -1] = d2[1, -1]
+        d2[-1, 0] = d2[-1, 1]
+        d2[-1, -1] = d2[-1, -2]
         data = d2
-    
+
     sideTable = [
         [],
-        [0,1],
-        [1,2],
-        [0,2],
-        [0,3],
-        [1,3],
-        [0,1,2,3],
-        [2,3],
-        [2,3],
-        [0,1,2,3],
-        [1,3],
-        [0,3],
-        [0,2],
-        [1,2],
-        [0,1],
+        [0, 1],
+        [1, 2],
+        [0, 2],
+        [0, 3],
+        [1, 3],
+        [0, 1, 2, 3],
+        [2, 3],
+        [2, 3],
+        [0, 1, 2, 3],
+        [1, 3],
+        [0, 3],
+        [0, 2],
+        [1, 2],
+        [0, 1],
         []
-        ]
-    
-    edgeKey=[
-        [(0,1), (0,0)],
-        [(0,0), (1,0)],
-        [(1,0), (1,1)],
-        [(1,1), (0,1)]
-        ]
-    
-    
+    ]
+
+    edgeKey = [
+        [(0, 1), (0, 0)],
+        [(0, 0), (1, 0)],
+        [(1, 0), (1, 1)],
+        [(1, 1), (0, 1)]
+    ]
+
     lines = []
-    
-    ## mark everything below the isosurface level
+
+    # mark everything below the isosurface level
     mask = data < level
-    
-    ### make four sub-fields and compute indexes for grid cells
+
+    # make four sub-fields and compute indexes for grid cells
     index = np.zeros([x-1 for x in data.shape], dtype=np.ubyte)
-    fields = np.empty((2,2), dtype=object)
-    slices = [slice(0,-1), slice(1,None)]
-    for i in [0,1]:
-        for j in [0,1]:
-            fields[i,j] = mask[slices[i], slices[j]]
-            #vertIndex = i - 2*j*i + 3*j + 4*k  ## this is just to match Bourk's vertex numbering scheme
+    fields = np.empty((2, 2), dtype=object)
+    slices = [slice(0, -1), slice(1, None)]
+    for i in [0, 1]:
+        for j in [0, 1]:
+            fields[i, j] = mask[slices[i], slices[j]]
+            # vertIndex = i - 2*j*i + 3*j + 4*k  ## this is just to match Bourk's vertex numbering scheme
             vertIndex = i+2*j
-            #print i,j,k," : ", fields[i,j,k], 2**vertIndex
-            np.add(index, fields[i,j] * 2**vertIndex, out=index, casting='unsafe')
-            #print index
-    #print index
-    
-    ## add lines
+            # print i,j,k," : ", fields[i,j,k], 2**vertIndex
+            np.add(index, fields[i, j] * 2**vertIndex,
+                   out=index, casting='unsafe')
+            # print index
+    # print index
+
+    # add lines
     for i in range(index.shape[0]):                 # data x-axis
-        for j in range(index.shape[1]):             # data y-axis     
-            sides = sideTable[index[i,j]]
-            for l in range(0, len(sides), 2):     ## faces for this grid cell
+        for j in range(index.shape[1]):             # data y-axis
+            sides = sideTable[index[i, j]]
+            for l in range(0, len(sides), 2):  # faces for this grid cell
                 edges = sides[l:l+2]
                 pts = []
-                for m in [0,1]:      # points in this face
-                    p1 = edgeKey[edges[m]][0] # p1, p2 are points at either side of an edge
+                for m in [0, 1]:      # points in this face
+                    # p1, p2 are points at either side of an edge
+                    p1 = edgeKey[edges[m]][0]
                     p2 = edgeKey[edges[m]][1]
-                    v1 = data[i+p1[0], j+p1[1]] # v1 and v2 are the values at p1 and p2
+                    # v1 and v2 are the values at p1 and p2
+                    v1 = data[i+p1[0], j+p1[1]]
                     v2 = data[i+p2[0], j+p2[1]]
                     f = (level-v1) / (v2-v1)
                     fi = 1.0 - f
-                    p = (    ## interpolate between corners
-                        p1[0]*fi + p2[0]*f + i + 0.5, 
+                    p = (  # interpolate between corners
+                        p1[0]*fi + p2[0]*f + i + 0.5,
                         p1[1]*fi + p2[1]*f + j + 0.5
-                        )
+                    )
                     if extendToEdge:
-                        ## check bounds
+                        # check bounds
                         p = (
                             min(data.shape[0]-2, max(0, p[0]-1)),
-                            min(data.shape[1]-2, max(0, p[1]-1)),                        
+                            min(data.shape[1]-2, max(0, p[1]-1)),
                         )
                     if connected:
-                        gridKey = i + (1 if edges[m]==2 else 0), j + (1 if edges[m]==3 else 0), edges[m]%2
-                        pts.append((p, gridKey))  ## give the actual position and a key identifying the grid location (for connecting segments)
+                        gridKey = i + \
+                            (1 if edges[m] == 2 else 0), j + \
+                            (1 if edges[m] == 3 else 0), edges[m] % 2
+                        # give the actual position and a key identifying the grid location (for connecting segments)
+                        pts.append((p, gridKey))
                     else:
                         pts.append(p)
-                
+
                 lines.append(pts)
 
     if not connected:
         return lines
-                
-    ## turn disjoint list of segments into continuous lines
+
+    # turn disjoint list of segments into continuous lines
 
     #lines = [[2,5], [5,4], [3,4], [1,3], [6,7], [7,8], [8,6], [11,12], [12,15], [11,13], [13,14]]
     #lines = [[(float(a), a), (float(b), b)] for a,b in lines]
-    points = {}  ## maps each point to its connections
-    for a,b in lines:
+    points = {}  # maps each point to its connections
+    for a, b in lines:
         if a[1] not in points:
             points[a[1]] = []
-        points[a[1]].append([a,b])
+        points[a[1]].append([a, b])
         if b[1] not in points:
             points[b[1]] = []
-        points[b[1]].append([b,a])
+        points[b[1]].append([b, a])
 
-    ## rearrange into chains
+    # rearrange into chains
     for k in list(points.keys()):
         try:
             chains = points[k]
-        except KeyError:   ## already used this point elsewhere
+        except KeyError:  # already used this point elsewhere
             continue
-        #print "===========", k
+        # print "===========", k
         for chain in chains:
-            #print "  chain:", chain
+            # print "  chain:", chain
             x = None
             while True:
                 if x == chain[-1][1]:
-                    break ## nothing left to do on this chain
-                    
+                    break  # nothing left to do on this chain
+
                 x = chain[-1][1]
-                if x == k:  
-                    break ## chain has looped; we're done and can ignore the opposite chain
+                if x == k:
+                    break  # chain has looped; we're done and can ignore the opposite chain
                 y = chain[-2][1]
                 connects = points[x]
                 for conn in connects[:]:
                     if conn[1][1] != y:
-                        #print "    ext:", conn
+                        # print "    ext:", conn
                         chain.extend(conn[1:])
-                #print "    del:", x
+                # print "    del:", x
                 del points[x]
             if chain[0][1] == chain[-1][1]:  # looped chain; no need to continue the other direction
                 chains.pop()
                 break
-                
 
-    ## extract point locations 
+    # extract point locations
     lines = []
     for chain in points.values():
         if len(chain) == 2:
-            chain = chain[1][1:][::-1] + chain[0]  # join together ends of chain
+            # join together ends of chain
+            chain = chain[1][1:][::-1] + chain[0]
         else:
             chain = chain[0]
         lines.append([p[0] for p in chain])
-    
+
     if not path:
-        return lines ## a list of pairs of points
-    
+        return lines  # a list of pairs of points
+
     path = QtGui.QPainterPath()
     for line in lines:
         path.moveTo(*line[0])
         for p in line[1:]:
             path.lineTo(*p)
-    
+
     return path
-    
-    
+
+
 def traceImage(image, values, smooth=0.5):
     """
     Convert an image to a set of QPainterPath curves.
     One curve will be generated for each item in *values*; each curve outlines the area
     of the image that is closer to its value than to any others.
-    
+
     If image is RGB or RGBA, then the shape of values should be (nvals, 3/4)
     The parameter *smooth* is expressed in pixels.
     """
     try:
         import scipy.ndimage as ndi
     except ImportError:
-        raise Exception("traceImage() requires the package scipy.ndimage, but it is not importable.")
-    
+        raise Exception(
+            "traceImage() requires the package scipy.ndimage, but it is not importable.")
+
     if values.ndim == 2:
         values = values.T
     values = values[np.newaxis, np.newaxis, ...].astype(float)
@@ -1810,12 +1858,12 @@ def traceImage(image, values, smooth=0.5):
     diff = np.abs(image-values)
     if values.ndim == 4:
         diff = diff.sum(axis=2)
-        
+
     labels = np.argmin(diff, axis=2)
-    
+
     paths = []
-    for i in range(diff.shape[-1]):    
-        d = (labels==i).astype(float)
+    for i in range(diff.shape[-1]):
+        d = (labels == i).astype(float)
         d = gaussianFilter(d, (smooth, smooth))
         lines = isocurve(d, 0.5, connected=True, extendToEdge=True)
         path = QtGui.QPainterPath()
@@ -1823,77 +1871,78 @@ def traceImage(image, values, smooth=0.5):
             path.moveTo(*line[0])
             for p in line[1:]:
                 path.lineTo(*p)
-        
+
         paths.append(path)
     return paths
-    
-    
-    
+
+
 IsosurfaceDataCache = None
+
+
 def isosurface(data, level):
     """
     Generate isosurface from volumetric data using marching cubes algorithm.
     See Paul Bourke, "Polygonising a Scalar Field"  
     (http://paulbourke.net/geometry/polygonise/)
-    
+
     *data*   3D numpy array of scalar values. Must be contiguous.
     *level*  The level at which to generate an isosurface
-    
+
     Returns an array of vertex coordinates (Nv, 3) and an array of 
     per-face vertex indexes (Nf, 3)    
     """
-    ## For improvement, see:
-    ## 
-    ## Efficient implementation of Marching Cubes' cases with topological guarantees.
-    ## Thomas Lewiner, Helio Lopes, Antonio Wilson Vieira and Geovan Tavares.
-    ## Journal of Graphics Tools 8(2): pp. 1-15 (december 2003)
-    
-    ## Precompute lookup tables on the first run
+    # For improvement, see:
+    ##
+    # Efficient implementation of Marching Cubes' cases with topological guarantees.
+    # Thomas Lewiner, Helio Lopes, Antonio Wilson Vieira and Geovan Tavares.
+    # Journal of Graphics Tools 8(2): pp. 1-15 (december 2003)
+
+    # Precompute lookup tables on the first run
     global IsosurfaceDataCache
     if IsosurfaceDataCache is None:
-        ## map from grid cell index to edge index.
-        ## grid cell index tells us which corners are below the isosurface,
-        ## edge index tells us which edges are cut by the isosurface.
-        ## (Data stolen from Bourk; see above.)
+        # map from grid cell index to edge index.
+        # grid cell index tells us which corners are below the isosurface,
+        # edge index tells us which edges are cut by the isosurface.
+        # (Data stolen from Bourk; see above.)
         edgeTable = np.array([
-            0x0  , 0x109, 0x203, 0x30a, 0x406, 0x50f, 0x605, 0x70c,
+            0x0, 0x109, 0x203, 0x30a, 0x406, 0x50f, 0x605, 0x70c,
             0x80c, 0x905, 0xa0f, 0xb06, 0xc0a, 0xd03, 0xe09, 0xf00,
-            0x190, 0x99 , 0x393, 0x29a, 0x596, 0x49f, 0x795, 0x69c,
+            0x190, 0x99, 0x393, 0x29a, 0x596, 0x49f, 0x795, 0x69c,
             0x99c, 0x895, 0xb9f, 0xa96, 0xd9a, 0xc93, 0xf99, 0xe90,
-            0x230, 0x339, 0x33 , 0x13a, 0x636, 0x73f, 0x435, 0x53c,
+            0x230, 0x339, 0x33, 0x13a, 0x636, 0x73f, 0x435, 0x53c,
             0xa3c, 0xb35, 0x83f, 0x936, 0xe3a, 0xf33, 0xc39, 0xd30,
-            0x3a0, 0x2a9, 0x1a3, 0xaa , 0x7a6, 0x6af, 0x5a5, 0x4ac,
+            0x3a0, 0x2a9, 0x1a3, 0xaa, 0x7a6, 0x6af, 0x5a5, 0x4ac,
             0xbac, 0xaa5, 0x9af, 0x8a6, 0xfaa, 0xea3, 0xda9, 0xca0,
-            0x460, 0x569, 0x663, 0x76a, 0x66 , 0x16f, 0x265, 0x36c,
+            0x460, 0x569, 0x663, 0x76a, 0x66, 0x16f, 0x265, 0x36c,
             0xc6c, 0xd65, 0xe6f, 0xf66, 0x86a, 0x963, 0xa69, 0xb60,
-            0x5f0, 0x4f9, 0x7f3, 0x6fa, 0x1f6, 0xff , 0x3f5, 0x2fc,
+            0x5f0, 0x4f9, 0x7f3, 0x6fa, 0x1f6, 0xff, 0x3f5, 0x2fc,
             0xdfc, 0xcf5, 0xfff, 0xef6, 0x9fa, 0x8f3, 0xbf9, 0xaf0,
-            0x650, 0x759, 0x453, 0x55a, 0x256, 0x35f, 0x55 , 0x15c,
+            0x650, 0x759, 0x453, 0x55a, 0x256, 0x35f, 0x55, 0x15c,
             0xe5c, 0xf55, 0xc5f, 0xd56, 0xa5a, 0xb53, 0x859, 0x950,
-            0x7c0, 0x6c9, 0x5c3, 0x4ca, 0x3c6, 0x2cf, 0x1c5, 0xcc ,
+            0x7c0, 0x6c9, 0x5c3, 0x4ca, 0x3c6, 0x2cf, 0x1c5, 0xcc,
             0xfcc, 0xec5, 0xdcf, 0xcc6, 0xbca, 0xac3, 0x9c9, 0x8c0,
             0x8c0, 0x9c9, 0xac3, 0xbca, 0xcc6, 0xdcf, 0xec5, 0xfcc,
-            0xcc , 0x1c5, 0x2cf, 0x3c6, 0x4ca, 0x5c3, 0x6c9, 0x7c0,
+            0xcc, 0x1c5, 0x2cf, 0x3c6, 0x4ca, 0x5c3, 0x6c9, 0x7c0,
             0x950, 0x859, 0xb53, 0xa5a, 0xd56, 0xc5f, 0xf55, 0xe5c,
-            0x15c, 0x55 , 0x35f, 0x256, 0x55a, 0x453, 0x759, 0x650,
+            0x15c, 0x55, 0x35f, 0x256, 0x55a, 0x453, 0x759, 0x650,
             0xaf0, 0xbf9, 0x8f3, 0x9fa, 0xef6, 0xfff, 0xcf5, 0xdfc,
-            0x2fc, 0x3f5, 0xff , 0x1f6, 0x6fa, 0x7f3, 0x4f9, 0x5f0,
+            0x2fc, 0x3f5, 0xff, 0x1f6, 0x6fa, 0x7f3, 0x4f9, 0x5f0,
             0xb60, 0xa69, 0x963, 0x86a, 0xf66, 0xe6f, 0xd65, 0xc6c,
-            0x36c, 0x265, 0x16f, 0x66 , 0x76a, 0x663, 0x569, 0x460,
+            0x36c, 0x265, 0x16f, 0x66, 0x76a, 0x663, 0x569, 0x460,
             0xca0, 0xda9, 0xea3, 0xfaa, 0x8a6, 0x9af, 0xaa5, 0xbac,
-            0x4ac, 0x5a5, 0x6af, 0x7a6, 0xaa , 0x1a3, 0x2a9, 0x3a0,
+            0x4ac, 0x5a5, 0x6af, 0x7a6, 0xaa, 0x1a3, 0x2a9, 0x3a0,
             0xd30, 0xc39, 0xf33, 0xe3a, 0x936, 0x83f, 0xb35, 0xa3c,
-            0x53c, 0x435, 0x73f, 0x636, 0x13a, 0x33 , 0x339, 0x230,
+            0x53c, 0x435, 0x73f, 0x636, 0x13a, 0x33, 0x339, 0x230,
             0xe90, 0xf99, 0xc93, 0xd9a, 0xa96, 0xb9f, 0x895, 0x99c,
-            0x69c, 0x795, 0x49f, 0x596, 0x29a, 0x393, 0x99 , 0x190,
+            0x69c, 0x795, 0x49f, 0x596, 0x29a, 0x393, 0x99, 0x190,
             0xf00, 0xe09, 0xd03, 0xc0a, 0xb06, 0xa0f, 0x905, 0x80c,
-            0x70c, 0x605, 0x50f, 0x406, 0x30a, 0x203, 0x109, 0x0   
-            ], dtype=np.uint16)
-        
-        ## Table of triangles to use for filling each grid cell.
-        ## Each set of three integers tells us which three edges to
-        ## draw a triangle between.
-        ## (Data stolen from Bourk; see above.)
+            0x70c, 0x605, 0x50f, 0x406, 0x30a, 0x203, 0x109, 0x0
+        ], dtype=np.uint16)
+
+        # Table of triangles to use for filling each grid cell.
+        # Each set of three integers tells us which three edges to
+        # draw a triangle between.
+        # (Data stolen from Bourk; see above.)
         triTable = [
             [],
             [0, 8, 3],
@@ -2151,9 +2200,9 @@ def isosurface(data, level):
             [0, 9, 1],
             [0, 3, 8],
             []
-        ]    
-        edgeShifts = np.array([  ## maps edge ID (0-11) to (x,y,z) cell offset and edge ID (0-2)
-            [0, 0, 0, 0],   
+        ]
+        edgeShifts = np.array([  # maps edge ID (0-11) to (x,y,z) cell offset and edge ID (0-2)
+            [0, 0, 0, 0],
             [1, 0, 0, 1],
             [0, 1, 0, 0],
             [0, 0, 0, 1],
@@ -2165,26 +2214,27 @@ def isosurface(data, level):
             [1, 0, 0, 2],
             [1, 1, 0, 2],
             [0, 1, 0, 2],
-            #[9, 9, 9, 9]  ## fake
-        ], dtype=np.uint16) # don't use ubyte here! This value gets added to cell index later; will need the extra precision.
+            # [9, 9, 9, 9]  ## fake
+        ], dtype=np.uint16)  # don't use ubyte here! This value gets added to cell index later; will need the extra precision.
         nTableFaces = np.array([len(f)/3 for f in triTable], dtype=np.ubyte)
         faceShiftTables = [None]
-        for i in range(1,6):
-            ## compute lookup table of index: vertexes mapping
+        for i in range(1, 6):
+            # compute lookup table of index: vertexes mapping
             faceTableI = np.zeros((len(triTable), i*3), dtype=np.ubyte)
             faceTableInds = np.argwhere(nTableFaces == i)
-            faceTableI[faceTableInds[:,0]] = np.array([triTable[j[0]] for j in faceTableInds])
+            faceTableI[faceTableInds[:, 0]] = np.array(
+                [triTable[j[0]] for j in faceTableInds])
             faceTableI = faceTableI.reshape((len(triTable), i, 3))
             faceShiftTables.append(edgeShifts[faceTableI])
-            
-        ## Let's try something different:
-        #faceTable = np.empty((256, 5, 3, 4), dtype=np.ubyte)   # (grid cell index, faces, vertexes, edge lookup)
-        #for i,f in enumerate(triTable):
+
+        # Let's try something different:
+        # faceTable = np.empty((256, 5, 3, 4), dtype=np.ubyte)   # (grid cell index, faces, vertexes, edge lookup)
+        # for i,f in enumerate(triTable):
             #f = np.array(f + [12] * (15-len(f))).reshape(5,3)
             #faceTable[i] = edgeShifts[f]
-        
-        
-        IsosurfaceDataCache = (faceShiftTables, edgeShifts, edgeTable, nTableFaces)
+
+        IsosurfaceDataCache = (
+            faceShiftTables, edgeShifts, edgeTable, nTableFaces)
     else:
         faceShiftTables, edgeShifts, edgeTable, nTableFaces = IsosurfaceDataCache
 
@@ -2192,156 +2242,163 @@ def isosurface(data, level):
     # Ideally we can fix this just by removing the dependency on strides.
     if not data.flags['C_CONTIGUOUS']:
         raise TypeError("isosurface input data must be c-contiguous.")
-    
-    ## mark everything below the isosurface level
+
+    # mark everything below the isosurface level
     mask = data < level
-    
-    ### make eight sub-fields and compute indexes for grid cells
+
+    # make eight sub-fields and compute indexes for grid cells
     index = np.zeros([x-1 for x in data.shape], dtype=np.ubyte)
-    fields = np.empty((2,2,2), dtype=object)
-    slices = [slice(0,-1), slice(1,None)]
-    for i in [0,1]:
-        for j in [0,1]:
-            for k in [0,1]:
-                fields[i,j,k] = mask[slices[i], slices[j], slices[k]]
-                vertIndex = i - 2*j*i + 3*j + 4*k  ## this is just to match Bourk's vertex numbering scheme
-                np.add(index, fields[i,j,k] * 2**vertIndex, out=index, casting='unsafe')
-    
-    ### Generate table of edges that have been cut
+    fields = np.empty((2, 2, 2), dtype=object)
+    slices = [slice(0, -1), slice(1, None)]
+    for i in [0, 1]:
+        for j in [0, 1]:
+            for k in [0, 1]:
+                fields[i, j, k] = mask[slices[i], slices[j], slices[k]]
+                # this is just to match Bourk's vertex numbering scheme
+                vertIndex = i - 2*j*i + 3*j + 4*k
+                np.add(index, fields[i, j, k] * 2 **
+                       vertIndex, out=index, casting='unsafe')
+
+    # Generate table of edges that have been cut
     cutEdges = np.zeros([x+1 for x in index.shape]+[3], dtype=np.uint32)
     edges = edgeTable[index]
-    for i, shift in enumerate(edgeShifts[:12]):        
-        slices = [slice(shift[j],cutEdges.shape[j]+(shift[j]-1)) for j in range(3)]
+    for i, shift in enumerate(edgeShifts[:12]):
+        slices = [slice(shift[j], cutEdges.shape[j]+(shift[j]-1))
+                  for j in range(3)]
         cutEdges[slices[0], slices[1], slices[2], shift[3]] += edges & 2**i
-    
-    ## for each cut edge, interpolate to see where exactly the edge is cut and generate vertex positions
+
+    # for each cut edge, interpolate to see where exactly the edge is cut and generate vertex positions
     m = cutEdges > 0
-    vertexInds = np.argwhere(m)   ## argwhere is slow!
-    vertexes = vertexInds[:,:3].astype(np.float32)
+    vertexInds = np.argwhere(m)  # argwhere is slow!
+    vertexes = vertexInds[:, :3].astype(np.float32)
     dataFlat = data.reshape(data.shape[0]*data.shape[1]*data.shape[2])
-    
-    ## re-use the cutEdges array as a lookup table for vertex IDs
-    cutEdges[vertexInds[:,0], vertexInds[:,1], vertexInds[:,2], vertexInds[:,3]] = np.arange(vertexInds.shape[0])
-    
-    for i in [0,1,2]:
-        vim = vertexInds[:,3] == i
+
+    # re-use the cutEdges array as a lookup table for vertex IDs
+    cutEdges[vertexInds[:, 0], vertexInds[:, 1], vertexInds[:, 2],
+             vertexInds[:, 3]] = np.arange(vertexInds.shape[0])
+
+    for i in [0, 1, 2]:
+        vim = vertexInds[:, 3] == i
         vi = vertexInds[vim, :3]
-        viFlat = (vi * (np.array(data.strides[:3]) // data.itemsize)[np.newaxis,:]).sum(axis=1)
+        viFlat = (
+            vi * (np.array(data.strides[:3]) // data.itemsize)[np.newaxis, :]).sum(axis=1)
         v1 = dataFlat[viFlat]
         v2 = dataFlat[viFlat + data.strides[i]//data.itemsize]
-        vertexes[vim,i] += (level-v1) / (v2-v1)
-    
-    ### compute the set of vertex indexes for each face. 
-    
-    ## This works, but runs a bit slower.
-    #cells = np.argwhere((index != 0) & (index != 255))  ## all cells with at least one face
+        vertexes[vim, i] += (level-v1) / (v2-v1)
+
+    # compute the set of vertex indexes for each face.
+
+    # This works, but runs a bit slower.
+    # cells = np.argwhere((index != 0) & (index != 255))  ## all cells with at least one face
     #cellInds = index[cells[:,0], cells[:,1], cells[:,2]]
     #verts = faceTable[cellInds]
     #mask = verts[...,0,0] != 9
-    #verts[...,:3] += cells[:,np.newaxis,np.newaxis,:]  ## we now have indexes into cutEdges
+    # verts[...,:3] += cells[:,np.newaxis,np.newaxis,:]  ## we now have indexes into cutEdges
     #verts = verts[mask]
-    #faces = cutEdges[verts[...,0], verts[...,1], verts[...,2], verts[...,3]]  ## and these are the vertex indexes we want.
-    
-    
-    ## To allow this to be vectorized efficiently, we count the number of faces in each 
-    ## grid cell and handle each group of cells with the same number together.
-    ## determine how many faces to assign to each grid cell
+    # faces = cutEdges[verts[...,0], verts[...,1], verts[...,2], verts[...,3]]  ## and these are the vertex indexes we want.
+
+    # To allow this to be vectorized efficiently, we count the number of faces in each
+    # grid cell and handle each group of cells with the same number together.
+    # determine how many faces to assign to each grid cell
     nFaces = nTableFaces[index]
     totFaces = nFaces.sum()
     faces = np.empty((totFaces, 3), dtype=np.uint32)
     ptr = 0
     #import debug
     #p = debug.Profiler()
-    
-    ## this helps speed up an indexing operation later on
+
+    # this helps speed up an indexing operation later on
     cs = np.array(cutEdges.strides)//cutEdges.itemsize
     cutEdges = cutEdges.flatten()
 
-    ## this, strangely, does not seem to help.
+    # this, strangely, does not seem to help.
     #ins = np.array(index.strides)/index.itemsize
     #index = index.flatten()
 
-    for i in range(1,6):
-        ### expensive:
-        #profiler()
-        cells = np.argwhere(nFaces == i)  ## all cells which require i faces  (argwhere is expensive)
-        #profiler()
+    for i in range(1, 6):
+        # expensive:
+        # profiler()
+        # all cells which require i faces  (argwhere is expensive)
+        cells = np.argwhere(nFaces == i)
+        # profiler()
         if cells.shape[0] == 0:
             continue
-        cellInds = index[cells[:,0], cells[:,1], cells[:,2]]   ## index values of cells to process for this round
-        #profiler()
-        
-        ### expensive:
+        # index values of cells to process for this round
+        cellInds = index[cells[:, 0], cells[:, 1], cells[:, 2]]
+        # profiler()
+
+        # expensive:
         verts = faceShiftTables[i][cellInds]
-        #profiler()
-        np.add(verts[...,:3], cells[:,np.newaxis,np.newaxis,:], out=verts[...,:3], casting='unsafe')  ## we now have indexes into cutEdges
+        # profiler()
+        np.add(verts[..., :3], cells[:, np.newaxis, np.newaxis, :],
+               out=verts[..., :3], casting='unsafe')  # we now have indexes into cutEdges
         verts = verts.reshape((verts.shape[0]*i,)+verts.shape[2:])
-        #profiler()
-        
-        ### expensive:
+        # profiler()
+
+        # expensive:
         verts = (verts * cs[np.newaxis, np.newaxis, :]).sum(axis=2)
         vertInds = cutEdges[verts]
-        #profiler()
+        # profiler()
         nv = vertInds.shape[0]
-        #profiler()
-        faces[ptr:ptr+nv] = vertInds #.reshape((nv, 3))
-        #profiler()
+        # profiler()
+        faces[ptr:ptr+nv] = vertInds  # .reshape((nv, 3))
+        # profiler()
         ptr += nv
-        
+
     return vertexes, faces
 
 
-    
 def invertQTransform(tr):
     """Return a QTransform that is the inverse of *tr*.
     Rasises an exception if tr is not invertible.
-    
+
     Note that this function is preferred over QTransform.inverted() due to
     bugs in that method. (specifically, Qt has floating-point precision issues
     when determining whether a matrix is invertible)
     """
     try:
         import numpy.linalg
-        arr = np.array([[tr.m11(), tr.m12(), tr.m13()], [tr.m21(), tr.m22(), tr.m23()], [tr.m31(), tr.m32(), tr.m33()]])
+        arr = np.array([[tr.m11(), tr.m12(), tr.m13()], [
+                       tr.m21(), tr.m22(), tr.m23()], [tr.m31(), tr.m32(), tr.m33()]])
         inv = numpy.linalg.inv(arr)
-        return QtGui.QTransform(inv[0,0], inv[0,1], inv[0,2], inv[1,0], inv[1,1], inv[1,2], inv[2,0], inv[2,1])
+        return QtGui.QTransform(inv[0, 0], inv[0, 1], inv[0, 2], inv[1, 0], inv[1, 1], inv[1, 2], inv[2, 0], inv[2, 1])
     except ImportError:
         inv = tr.inverted()
         if inv[1] is False:
             raise Exception("Transform is not invertible.")
         return inv[0]
-    
-    
+
+
 def pseudoScatter(data, spacing=None, shuffle=True, bidir=False):
     """
     Used for examining the distribution of values in a set. Produces scattering as in beeswarm or column scatter plots.
-    
+
     Given a list of x-values, construct a set of y-values such that an x,y scatter-plot
     will not have overlapping points (it will look similar to a histogram).
     """
     inds = np.arange(len(data))
     if shuffle:
         np.random.shuffle(inds)
-        
+
     data = data[inds]
-    
+
     if spacing is None:
         spacing = 2.*np.std(data)/len(data)**0.5
     s2 = spacing**2
-    
+
     yvals = np.empty(len(data))
     if len(data) == 0:
         return yvals
     yvals[0] = 0
-    for i in range(1,len(data)):
+    for i in range(1, len(data)):
         x = data[i]     # current x value to be placed
         x0 = data[:i]   # all x values already placed
         y0 = yvals[:i]  # all y values already placed
         y = 0
-        
+
         dx = (x0-x)**2  # x-distance to each previous point
         xmask = dx < s2  # exclude anything too far away
-        
+
         if xmask.sum() > 0:
             if bidir:
                 dirs = [-1, 1]
@@ -2351,37 +2408,37 @@ def pseudoScatter(data, spacing=None, shuffle=True, bidir=False):
             for direction in dirs:
                 y = 0
                 dx2 = dx[xmask]
-                dy = (s2 - dx2)**0.5   
-                limits = np.empty((2,len(dy)))  # ranges of y-values to exclude
+                dy = (s2 - dx2)**0.5
+                # ranges of y-values to exclude
+                limits = np.empty((2, len(dy)))
                 limits[0] = y0[xmask] - dy
-                limits[1] = y0[xmask] + dy    
+                limits[1] = y0[xmask] + dy
                 while True:
                     # ignore anything below this y-value
                     if direction > 0:
                         mask = limits[1] >= y
                     else:
                         mask = limits[0] <= y
-                        
-                    limits2 = limits[:,mask]
-                    
+
+                    limits2 = limits[:, mask]
+
                     # are we inside an excluded region?
                     mask = (limits2[0] < y) & (limits2[1] > y)
                     if mask.sum() == 0:
                         break
-                        
+
                     if direction > 0:
-                        y = limits2[:,mask].max()
+                        y = limits2[:, mask].max()
                     else:
-                        y = limits2[:,mask].min()
+                        y = limits2[:, mask].min()
                 yopts.append(y)
             if bidir:
                 y = yopts[0] if -yopts[0] < yopts[1] else yopts[1]
             else:
                 y = yopts[0]
         yvals[i] = y
-    
-    return yvals[np.argsort(inds)]  ## un-shuffle values before returning
 
+    return yvals[np.argsort(inds)]  # un-shuffle values before returning
 
 
 def toposort(deps, nodes=None, seen=None, stack=None, depth=0):
@@ -2390,7 +2447,7 @@ def toposort(deps, nodes=None, seen=None, stack=None, depth=0):
       nodes   optional, specifies list of starting nodes (these should be the nodes 
               which are not depended on by any other nodes). Other candidate starting
               nodes will be ignored.
-              
+
     Example::
 
         # Sort the following graph:
@@ -2405,13 +2462,13 @@ def toposort(deps, nodes=None, seen=None, stack=None, depth=0):
     """
     # fill in empty dep lists
     deps = deps.copy()
-    for k,v in list(deps.items()):
+    for k, v in list(deps.items()):
         for k in v:
             if k not in deps:
                 deps[k] = []
-    
+
     if nodes is None:
-        ## run through deps to find nodes that are not depended upon
+        # run through deps to find nodes that are not depended upon
         rem = set()
         for dep in deps.values():
             rem |= set(dep)
@@ -2426,7 +2483,7 @@ def toposort(deps, nodes=None, seen=None, stack=None, depth=0):
         if n in seen:
             continue
         seen.add(n)
-        sorted.extend( toposort(deps, deps[n], seen, stack+[n], depth=depth+1))
+        sorted.extend(toposort(deps, deps[n], seen, stack+[n], depth=depth+1))
         sorted.append(n)
     return sorted
 
@@ -2457,6 +2514,7 @@ class SignalBlock(object):
             # do something that emits a signal; it will
             # not be delivered to slot
     """
+
     def __init__(self, signal, slot):
         self.signal = signal
         self.slot = slot
@@ -2468,6 +2526,3 @@ class SignalBlock(object):
     def __exit__(self, *args):
         if self.reconnect:
             self.signal.connect(self.slot)
-
-
-

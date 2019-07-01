@@ -5,8 +5,9 @@ from PyQt5 import uic, QtWidgets, QtCore
 
 class MatrixElement(QtWidgets.QWidget):
     _quick_view_instance = None
+    quickview_selected = QtCore.pyqtSignal(object)
 
-    def __init__(self, title="Name"):
+    def __init__(self):
         QtWidgets.QWidget.__init__(self)
         path_ui = pkg_resources.resource_filename(
             "shapeout2.gui", "matrix_element.ui")
@@ -31,19 +32,19 @@ class MatrixElement(QtWidgets.QWidget):
         if self.selected and self.enabled:
             color = "#86E789"  # green
             label = "active"
-            tooltip = "Click to deactivate\nShift+Click for QuickView"
+            tooltip = "Click to deactivate\nShift+Click for Quick View"
         elif self.selected and not self.enabled:
             color = "#A4D5A7"  # gray-green
             label = "active\n(disabled)"
-            tooltip = "Click to deactivate\nShift+Click for QuickView"
+            tooltip = "Click to deactivate\nShift+Click for Quick View"
         elif not self.selected and self.enabled:
             color = "#EFEFEF"  # light gray
             label = "inactive"
-            tooltip = "Click to activate\nShift+Click for QuickView"
+            tooltip = "Click to activate\nShift+Click for Quick View"
         else:
             color = "#C0C1C0"  # gray
             label = "inactive"
-            tooltip = "Click to activate\nShift+Click for QuickView"
+            tooltip = "Click to activate\nShift+Click for Quick View"
 
         curinst = MatrixElement._quick_view_instance
         if curinst is self:
@@ -60,6 +61,7 @@ class MatrixElement(QtWidgets.QWidget):
         if do_quickview:
             color = "#F0A1D6"
             label += "\n(QV)"
+            self.quickview_selected.emit("peter")
 
         self.setStyleSheet("background-color:{}".format(color))
         self.label.setText(label)

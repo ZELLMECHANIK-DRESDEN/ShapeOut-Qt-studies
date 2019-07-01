@@ -1,3 +1,4 @@
+import pathlib
 import pkg_resources
 import signal
 import sys
@@ -8,6 +9,7 @@ from PyQt5 import uic, QtCore, QtWidgets
 from . import info_view
 from . import quick_view
 
+from .. import settings
 from ..external import pyqtgraph as pg
 from .._version import version as __version__
 
@@ -41,10 +43,20 @@ class ShapeOut2(QtWidgets.QMainWindow):
         self.toolButton_new_filter.clicked.connect(self.data_matrix.add_filter)
         self.toolButton_new_dataset.clicked.connect(self.import_dataset)
         self.toolButton_import.clicked.connect(self.import_dataset)
-        
+        # settings
+        self.settings = settings.SettingsFile()
+
     def import_dataset(self):
-        path = "test dataset"
-        self.data_matrix.add_dataset(path)
+        fnames, _ = QtWidgets.QFileDialog.getOpenFileNames(
+            parent=self,
+            caption="Select an RT-DC measurement",
+            directory=self.settings.get_path(name="rtdc import dataset"),
+            filter="RT-DC Files (*.rtdc)")
+
+        for fn in fnames:
+            path = pathlib.Path(fn)
+            self.settings.set_path(wd=path.parent, name="rtdc import dataset")
+            self.data_matrix.add_dataset(path)
 
     def init_info_view(self):
         sub = QtWidgets.QMdiSubWindow()
@@ -67,6 +79,8 @@ class ShapeOut2(QtWidgets.QMainWindow):
         self.mdiArea.addSubWindow(sub)
         self.toolButton_quick_view.clicked.connect(sub.setVisible)
         self.subwindows["quick_view"] = sub
+        # signals
+        self.data_matrix.quickviewed.connect(self.widget_quick_view.show_rtdc)
         sub.setSystemMenu(None)
         sub.setWindowFlags(QtCore.Qt.CustomizeWindowHint
                            | QtCore.Qt.WindowTitleHint
@@ -74,16 +88,16 @@ class ShapeOut2(QtWidgets.QMainWindow):
 
     def on_data_matrix(self):
         if self.toolButton_dm.isChecked():
-            self.splitter.setSizes([200,1000])
+            self.splitter.setSizes([200, 1000])
         else:
-            self.splitter.setSizes([0,1])
+            self.splitter.setSizes([0, 1])
 
     def on_splitter(self):
         if self.splitter.sizes()[0] == 0:
             self.toolButton_dm.setChecked(False)
         else:
             self.toolButton_dm.setChecked(True)
-    
+
 
 def excepthook(etype, value, trace):
     """

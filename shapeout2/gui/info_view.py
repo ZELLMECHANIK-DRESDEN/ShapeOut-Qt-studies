@@ -12,3 +12,6 @@ class InfoView(QtWidgets.QWidget):
             "shapeout2.gui", "info_view.ui")
         uic.loadUi(path_ui, self)
         self.setWindowTitle("Info View")
+
+    def show(self, path):
+        pass

@@ -9,7 +9,10 @@ file format. Data structures may be nested and contain any data type as long
 as it can be converted to/from a string using repr and eval.
 """
 
-import re, os, sys, datetime
+import re
+import os
+import sys
+import datetime
 import numpy
 from .pgcollections import OrderedDict
 from . import units
@@ -17,7 +20,7 @@ from .python2_3 import asUnicode, basestring
 from .Qt import QtCore
 from .Point import Point
 from .colormap import ColorMap
-GLOBAL_PATH = None # so not thread safe.
+GLOBAL_PATH = None  # so not thread safe.
 
 
 class ParseError(Exception):
@@ -27,23 +30,25 @@ class ParseError(Exception):
         #self.message = message
         self.fileName = fileName
         Exception.__init__(self, message)
-        
+
     def __str__(self):
         if self.fileName is None:
             msg = "Error parsing string at line %d:\n" % self.lineNum
         else:
-            msg = "Error parsing config file '%s' at line %d:\n" % (self.fileName, self.lineNum)
+            msg = "Error parsing config file '%s' at line %d:\n" % (
+                self.fileName, self.lineNum)
         msg += "%s\n%s" % (self.line, self.message)
         return msg
         #raise Exception()
-        
+
 
 def writeConfigFile(data, fname):
     s = genString(data)
     fd = open(fname, 'w')
     fd.write(s)
     fd.close()
-    
+
+
 def readConfigFile(fname):
     #cwd = os.getcwd()
     global GLOBAL_PATH
@@ -53,9 +58,9 @@ def readConfigFile(fname):
             fname = fname2
 
     GLOBAL_PATH = os.path.dirname(os.path.abspath(fname))
-        
+
     try:
-        #os.chdir(newDir)  ## bad.
+        # os.chdir(newDir)  ## bad.
         fd = open(fname)
         s = asUnicode(fd.read())
         fd.close()
@@ -66,11 +71,12 @@ def readConfigFile(fname):
         sys.exc_info()[1].fileName = fname
         raise
     except:
-        print("Error while reading config file %s:"% fname)
+        print("Error while reading config file %s:" % fname)
         raise
-    #finally:
-        #os.chdir(cwd)
+    # finally:
+        # os.chdir(cwd)
     return data
+
 
 def appendConfigFile(data, fname):
     s = genString(data)
@@ -88,55 +94,58 @@ def genString(data, indent=''):
             raise Exception('blank dict keys not allowed (see data above)')
         if sk[0] == ' ' or ':' in sk:
             print(data)
-            raise Exception('dict keys must not contain ":" or start with spaces [offending key is "%s"]' % sk)
+            raise Exception(
+                'dict keys must not contain ":" or start with spaces [offending key is "%s"]' % sk)
         if isinstance(data[k], dict):
             s += indent + sk + ':\n'
             s += genString(data[k], indent + '    ')
         else:
             s += indent + sk + ': ' + repr(data[k]) + '\n'
     return s
-    
+
+
 def parseString(lines, start=0):
-    
+
     data = OrderedDict()
     if isinstance(lines, basestring):
         lines = lines.split('\n')
-        lines = [l for l in lines if re.search(r'\S', l) and not re.match(r'\s*#', l)]  ## remove empty lines
-        
+        lines = [l for l in lines if re.search(
+            r'\S', l) and not re.match(r'\s*#', l)]  # remove empty lines
+
     indent = measureIndent(lines[start])
     ln = start - 1
-    
+
     try:
         while True:
             ln += 1
-            #print ln
+            # print ln
             if ln >= len(lines):
                 break
-            
+
             l = lines[ln]
-            
+
             ## Skip blank lines or lines starting with #
             if re.match(r'\s*#', l) or not re.search(r'\S', l):
                 continue
-            
-            ## Measure line indentation, make sure it is correct for this level
+
+            # Measure line indentation, make sure it is correct for this level
             lineInd = measureIndent(l)
             if lineInd < indent:
                 ln -= 1
                 break
             if lineInd > indent:
-                #print lineInd, indent
-                raise ParseError('Indentation is incorrect. Expected %d, got %d' % (indent, lineInd), ln+1, l)
-            
-            
+                # print lineInd, indent
+                raise ParseError('Indentation is incorrect. Expected %d, got %d' % (
+                    indent, lineInd), ln+1, l)
+
             if ':' not in l:
                 raise ParseError('Missing colon', ln+1, l)
-            
+
             (k, p, v) = l.partition(':')
             k = k.strip()
             v = v.strip()
-            
-            ## set up local variables to use for eval
+
+            # set up local variables to use for eval
             local = units.allUnits.copy()
             local['OrderedDict'] = OrderedDict
             local['readConfigFile'] = readConfigFile
@@ -146,52 +155,54 @@ def parseString(lines, start=0):
             local['datetime'] = datetime
             # Needed for reconstructing numpy arrays
             local['array'] = numpy.array
-            for dtype in ['int8', 'uint8', 
+            for dtype in ['int8', 'uint8',
                           'int16', 'uint16', 'float16',
                           'int32', 'uint32', 'float32',
                           'int64', 'uint64', 'float64']:
                 local[dtype] = getattr(numpy, dtype)
-                
+
             if len(k) < 1:
                 raise ParseError('Missing name preceding colon', ln+1, l)
-            if k[0] == '(' and k[-1] == ')':  ## If the key looks like a tuple, try evaluating it.
+            # If the key looks like a tuple, try evaluating it.
+            if k[0] == '(' and k[-1] == ')':
                 try:
                     k1 = eval(k, local)
                     if type(k1) is tuple:
                         k = k1
                 except:
                     pass
-            if re.search(r'\S', v) and v[0] != '#':  ## eval the value
+            if re.search(r'\S', v) and v[0] != '#':  # eval the value
                 try:
                     val = eval(v, local)
                 except:
                     ex = sys.exc_info()[1]
-                    raise ParseError("Error evaluating expression '%s': [%s: %s]" % (v, ex.__class__.__name__, str(ex)), (ln+1), l)
+                    raise ParseError("Error evaluating expression '%s': [%s: %s]" % (
+                        v, ex.__class__.__name__, str(ex)), (ln+1), l)
             else:
                 if ln+1 >= len(lines) or measureIndent(lines[ln+1]) <= indent:
-                    #print "blank dict"
+                    # print "blank dict"
                     val = {}
                 else:
-                    #print "Going deeper..", ln+1
+                    # print "Going deeper..", ln+1
                     (ln, val) = parseString(lines, start=ln+1)
             data[k] = val
-        #print k, repr(val)
+        # print k, repr(val)
     except ParseError:
         raise
     except:
         ex = sys.exc_info()[1]
         raise ParseError("%s: %s" % (ex.__class__.__name__, str(ex)), ln+1, l)
-    #print "Returning shallower..", ln+1
+    # print "Returning shallower..", ln+1
     return (ln, data)
-    
+
+
 def measureIndent(s):
     n = 0
     while n < len(s) and s[n] == ' ':
         n += 1
     return n
-    
-    
-    
+
+
 if __name__ == '__main__':
     import tempfile
     fn = tempfile.mktemp()

@@ -5,10 +5,10 @@ def main(splash=True):
     import time
 
     from PyQt5.QtWidgets import QApplication
-    
+
     app = QApplication(sys.argv)
     imdir = pkg_resources.resource_filename("shapeout2", "img")
-    
+
     if splash:
         from PyQt5.QtWidgets import QSplashScreen
         from PyQt5.QtGui import QPixmap
@@ -29,8 +29,8 @@ def main(splash=True):
     app.setWindowIcon(QtGui.QIcon(icon_path))
 
     # Use dots as decimal separators
-    QtCore.QLocale.setDefault(QtCore.QLocale(QtCore.QLocale.C))    
-    
+    QtCore.QLocale.setDefault(QtCore.QLocale(QtCore.QLocale.C))
+
     window = ShapeOut2()
     window.show()
     window.raise_()
